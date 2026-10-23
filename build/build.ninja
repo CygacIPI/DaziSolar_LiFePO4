@@ -76,6 +76,15 @@ build CMakeFiles/lifepo4-core.dir/core/src/battery_alarms.c.obj: C_COMPILER__lif
   OBJECT_FILE_DIR = CMakeFiles\lifepo4-core.dir\core\src
   TARGET_SUPPORT_DIR = CMakeFiles\lifepo4-core.dir
 
+build CMakeFiles/lifepo4-core.dir/core/src/battery_coulomb_counter.c.obj: C_COMPILER__lifepo4-core_unscanned_Debug C$:/Users/DELL/Documents/DaziSolar_LiFePO4/core/src/battery_coulomb_counter.c || cmake_object_order_depends_target_lifepo4-core
+  CONFIG = Debug
+  DEP_FILE = CMakeFiles\lifepo4-core.dir\core\src\battery_coulomb_counter.c.obj.d
+  FLAGS = -g -std=c11
+  INCLUDES = -IC:/Users/DELL/Documents/DaziSolar_LiFePO4/core/include
+  OBJECT_DIR = CMakeFiles\lifepo4-core.dir
+  OBJECT_FILE_DIR = CMakeFiles\lifepo4-core.dir\core\src
+  TARGET_SUPPORT_DIR = CMakeFiles\lifepo4-core.dir
+
 build CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj: C_COMPILER__lifepo4-core_unscanned_Debug C$:/Users/DELL/Documents/DaziSolar_LiFePO4/core/src/battery_simulator.c || cmake_object_order_depends_target_lifepo4-core
   CONFIG = Debug
   DEP_FILE = CMakeFiles\lifepo4-core.dir\core\src\battery_simulator.c.obj.d
@@ -93,7 +102,7 @@ build CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj: C_COMPILER__
 #############################################
 # Link the static library liblifepo4-core.a
 
-build liblifepo4-core.a: C_STATIC_LIBRARY_LINKER__lifepo4-core_Debug CMakeFiles/lifepo4-core.dir/core/src/battery.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_calculations.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_alarms.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj
+build liblifepo4-core.a: C_STATIC_LIBRARY_LINKER__lifepo4-core_Debug CMakeFiles/lifepo4-core.dir/core/src/battery.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_calculations.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_alarms.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_coulomb_counter.c.obj CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj
   CONFIG = Debug
   LANGUAGE_COMPILE_FLAGS = -g
   OBJECT_DIR = CMakeFiles\lifepo4-core.dir

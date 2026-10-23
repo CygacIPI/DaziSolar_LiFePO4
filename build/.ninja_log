@@ -1,13 +1,22 @@
 # ninja log v7
-22	328	8144635305651892	CMakeFiles/lifepo4-desktop.dir/desktop/main.c.obj	1bb9be90920ac75d
+93	1133	8144637675064420	CMakeFiles/lifepo4-desktop.dir/desktop/main.c.obj	49ee6bf29ca54cae
 330	650	8144635308758242	lifepo4-desktop.exe	22eb6a838cd07dd0
 44	878	8144637674574698	CMakeFiles/lifepo4-core.dir/core/src/battery.c.obj	636033d489af4157
 67	1038	8144637674804572	CMakeFiles/lifepo4-core.dir/core/src/battery_alarms.c.obj	850af720143ad994
 54	1040	8144637674674634	CMakeFiles/lifepo4-core.dir/core/src/battery_calculations.c.obj	71afef5280e23d36
 80	1065	8144637674934497	CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj	c7a1ac8f5c098a71
-113	1129	8144637675274318	CMakeFiles/core-tests.dir/core/tests/test_core.c.obj	455548bffdf13f84
-93	1133	8144637675064420	CMakeFiles/lifepo4-desktop.dir/desktop/main.c.obj	49ee6bf29ca54cae
-1066	1718	8144637684798902	liblifepo4-core.a	25f72d3b221b4ae7
-1735	2111	8144637691485011	core-tests.exe	55dc850fb294ff2e
 21	404	8144637902588646	CMakeFiles/core-tests.dir/core/tests/test_core.c.obj	455548bffdf13f84
+1066	1718	8144637684798902	liblifepo4-core.a	25f72d3b221b4ae7
 405	781	8144637906429846	core-tests.exe	55dc850fb294ff2e
+17	496	8144640484057127	build.ninja	a2eece0b9a588463
+17	496	8144640484057127	C:/Users/DELL/Documents/DaziSolar_LiFePO4/build/cmake_install.cmake	a2eece0b9a588463
+17	496	8144640484057127	C:/Users/DELL/Documents/DaziSolar_LiFePO4/build/CTestTestfile.cmake	a2eece0b9a588463
+36	675	8144640485192445	CMakeFiles/lifepo4-core.dir/core/src/battery_calculations.c.obj	71afef5280e23d36
+22	695	8144640485036209	CMakeFiles/lifepo4-core.dir/core/src/battery.c.obj	636033d489af4157
+66	717	8144640485504817	CMakeFiles/lifepo4-core.dir/core/src/battery_coulomb_counter.c.obj	a8a8feb3d9e02a2e
+51	751	8144640485348609	CMakeFiles/lifepo4-core.dir/core/src/battery_alarms.c.obj	850af720143ad994
+82	757	8144640485661055	CMakeFiles/lifepo4-core.dir/core/src/battery_simulator.c.obj	c7a1ac8f5c098a71
+100	781	8144640485817258	CMakeFiles/core-tests.dir/core/tests/test_core.c.obj	455548bffdf13f84
+758	1071	8144640492423781	liblifepo4-core.a	bdae16d77319b75b
+1071	1393	8144640495518743	lifepo4-desktop.exe	687883da1ee37e70
+1085	1397	8144640495674843	core-tests.exe	55dc850fb294ff2e
