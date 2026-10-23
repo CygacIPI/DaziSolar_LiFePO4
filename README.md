@@ -71,6 +71,7 @@ Si cambias de generador o de compilador, elimina solo la carpeta generada `build
 ## Sprint 2: interfaz simulada
 
 - La ventana raylib muestra energia medida, energia nominal/util nominal (DoD fijo al 80%), SOC, capacidad restante, autonomia estimada, tension, corriente, potencia, ciclos, temperaturas, alarmas y las 16 tensiones de celda.
+- El estilo es un panel administrativo minimalista: navegacion lateral, fondo claro, tarjetas limpias y acentos verdes/azules inspirados en la identidad visual de Dazi Solar y el manual del equipo. El logo PNG facilitado para el proyecto se guarda sin modificar en `assets/dazi-solar-logo.png`; CMake lo copia a `build/assets/` junto al ejecutable. Si no se encuentra al iniciar, la aplicacion informa el problema y muestra una marca textual alternativa.
 - Se puede alternar entre los perfiles simulados de 100 Ah y 335 Ah. El grafico representa potencia con signo: positiva durante carga y negativa durante descarga.
 - Las muestras se actualizan cada segundo y el grafico conserva hasta 60 muestras. **Exportar CSV** guarda ese historial en `historial_simulado.csv` en la carpeta de trabajo actual; cada exportacion reemplaza el archivo anterior.
 - Esta pantalla es exclusivamente de simulacion. No existe conexion TCP, serie o CAN con la bateria; la informacion de celdas, temperatura y ciclos tambien es ficticia.

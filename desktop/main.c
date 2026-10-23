@@ -9,16 +9,17 @@
 #define HISTORY_CAPACITY 60
 #define DO_D_PCT 80
 
-static const Color COLOR_BACKGROUND = { 15, 22, 32, 255 };
-static const Color COLOR_PANEL = { 25, 35, 48, 255 };
-static const Color COLOR_PANEL_LIGHT = { 33, 46, 61, 255 };
-static const Color COLOR_BORDER = { 48, 64, 82, 255 };
-static const Color COLOR_TEXT = { 237, 243, 249, 255 };
-static const Color COLOR_MUTED = { 151, 168, 184, 255 };
-static const Color COLOR_CYAN = { 72, 203, 220, 255 };
-static const Color COLOR_GREEN = { 85, 207, 145, 255 };
-static const Color COLOR_AMBER = { 245, 185, 75, 255 };
-static const Color COLOR_RED = { 239, 103, 103, 255 };
+static const Color COLOR_BACKGROUND = { 246, 248, 250, 255 };
+static const Color COLOR_PANEL = { 255, 255, 255, 255 };
+static const Color COLOR_PANEL_LIGHT = { 246, 249, 251, 255 };
+static const Color COLOR_BORDER = { 224, 230, 235, 255 };
+static const Color COLOR_TEXT = { 35, 48, 60, 255 };
+static const Color COLOR_MUTED = { 119, 132, 143, 255 };
+static const Color COLOR_CYAN = { 42, 117, 163, 255 };
+static const Color COLOR_GREEN = { 111, 163, 63, 255 };
+static const Color COLOR_AMBER = { 204, 143, 42, 255 };
+static const Color COLOR_RED = { 194, 73, 65, 255 };
+static const Color COLOR_SIDEBAR = { 255, 255, 255, 255 };
 
 typedef struct {
     battery_data_t data;
@@ -37,8 +38,11 @@ static void draw_text(const char *text, int x, int y, int size, Color color)
 
 static void draw_panel(Rectangle bounds)
 {
-    DrawRectangleRounded(bounds, 0.12f, 8, COLOR_PANEL);
-    DrawRectangleRoundedLinesEx(bounds, 0.12f, 8, 1.0f, COLOR_BORDER);
+    DrawRectangle((int)bounds.x + 1, (int)bounds.y + 2,
+                  (int)bounds.width, (int)bounds.height,
+                  (Color){ 29, 45, 59, 10 });
+    DrawRectangleRec(bounds, COLOR_PANEL);
+    DrawRectangleLinesEx(bounds, 1.0f, COLOR_BORDER);
 }
 
 static bool button(Rectangle bounds, const char *label, bool selected, Color accent)
@@ -47,10 +51,10 @@ static bool button(Rectangle bounds, const char *label, bool selected, Color acc
     const bool hovered = CheckCollisionPointRec(mouse, bounds);
     const bool pressed = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     const Color fill = selected ? accent : (hovered ? COLOR_PANEL_LIGHT : COLOR_PANEL);
-    const Color text = selected ? COLOR_BACKGROUND : COLOR_TEXT;
+    const Color text = selected ? COLOR_PANEL : COLOR_TEXT;
 
-    DrawRectangleRounded(bounds, 0.25f, 8, fill);
-    DrawRectangleRoundedLines(bounds, 0.25f, 8, selected ? accent : COLOR_BORDER);
+    DrawRectangleRec(bounds, fill);
+    DrawRectangleLinesEx(bounds, 1.0f, selected ? accent : COLOR_BORDER);
     const int label_width = MeasureText(label, 15);
     draw_text(label, (int)(bounds.x + (bounds.width - label_width) / 2),
               (int)(bounds.y + (bounds.height - 15) / 2), 15, text);
@@ -62,8 +66,8 @@ static void draw_metric_card(Rectangle bounds, const char *title,
                              Color accent)
 {
     draw_panel(bounds);
-    draw_text(title, (int)bounds.x + 16, (int)bounds.y + 13, 14, COLOR_MUTED);
-    draw_text(value, (int)bounds.x + 16, (int)bounds.y + 35, 25, accent);
+    draw_text(title, (int)bounds.x + 16, (int)bounds.y + 13, 13, COLOR_MUTED);
+    draw_text(value, (int)bounds.x + 16, (int)bounds.y + 35, 24, accent);
     if (detail != NULL) {
         draw_text(detail, (int)bounds.x + 16, (int)bounds.y + 68, 12, COLOR_MUTED);
     }
@@ -82,9 +86,9 @@ static void draw_energy_card(Rectangle bounds,
 
     draw_panel(bounds);
     draw_text("ENERGIA ALMACENADA", (int)bounds.x + 18, (int)bounds.y + 14,
-              14, COLOR_MUTED);
-    draw_text(energy, (int)bounds.x + 18, (int)bounds.y + 37, 33, COLOR_CYAN);
-    draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 91, 12, COLOR_MUTED);
+              13, COLOR_MUTED);
+    draw_text(energy, (int)bounds.x + 18, (int)bounds.y + 37, 32, COLOR_CYAN);
+    draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 94, 12, COLOR_MUTED);
 }
 
 static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
@@ -101,11 +105,11 @@ static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
               14, COLOR_MUTED);
     draw_text(percent, (int)bounds.x + 18, (int)bounds.y + 36, 33, COLOR_GREEN);
     const Rectangle bar = { bounds.x + 18, bounds.y + 83, bounds.width - 36, 13 };
-    DrawRectangleRounded(bar, 0.5f, 8, COLOR_PANEL_LIGHT);
+    DrawRectangleRec(bar, COLOR_PANEL_LIGHT);
     Rectangle fill = bar;
     fill.width *= (float)data->soc_pct / 100.0f;
     if (fill.width > 0) {
-        DrawRectangleRounded(fill, 0.5f, 8, COLOR_GREEN);
+        DrawRectangleRec(fill, COLOR_GREEN);
     }
     draw_text(capacity, (int)bounds.x + 18, (int)bounds.y + 103, 12, COLOR_MUTED);
 }
@@ -176,7 +180,8 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
         snprintf(value, sizeof(value), "%.3f V",
                  (double)data->cell_mV[i] / 1000.0);
         snprintf(label, sizeof(label), "CEL %u", (unsigned)(i + 1));
-        DrawRectangleRounded(cell, 0.15f, 6, COLOR_PANEL_LIGHT);
+        DrawRectangleRec(cell, COLOR_PANEL_LIGHT);
+        DrawRectangleLinesEx(cell, 1.0f, COLOR_BORDER);
         draw_text(label, (int)cell.x + 7, (int)cell.y + 7, 10, COLOR_MUTED);
         draw_text(value, (int)cell.x + 7, (int)cell.y + 26, 13, COLOR_TEXT);
     }
@@ -309,6 +314,51 @@ static void append_sample(history_t *history, const battery_data_t *data)
     history->count++;
 }
 
+static void draw_sidebar(int screen_height, Texture2D logo, bool logo_loaded)
+{
+    const float sidebar_width = 220.0f;
+    DrawRectangle(0, 0, (int)sidebar_width, screen_height, COLOR_SIDEBAR);
+    DrawLine((int)sidebar_width, 0, (int)sidebar_width, screen_height, COLOR_BORDER);
+
+    if (logo_loaded) {
+        const float logo_height = 38.0f;
+        const float logo_width = logo_height *
+                                 (float)logo.width / (float)logo.height;
+        const Rectangle source = {
+            0.0f, 0.0f, (float)logo.width, (float)logo.height
+        };
+        const Rectangle destination = {
+            24.0f, 22.0f, logo_width, logo_height
+        };
+        DrawTexturePro(logo, source, destination, (Vector2){ 0.0f, 0.0f },
+                       0.0f, WHITE);
+    } else {
+        draw_text("DAZI SOLAR", 24, 31, 22, COLOR_TEXT);
+    }
+    DrawLine(24, 78, 196, 78, COLOR_BORDER);
+
+    draw_text("MONITOREO", 24, 103, 11, COLOR_MUTED);
+    const Rectangle active_item = { 12, 128, 196, 40 };
+    DrawRectangleRec(active_item, (Color){ 239, 246, 233, 255 });
+    DrawRectangle(12, 128, 3, 40, COLOR_GREEN);
+    DrawCircle(34, 148, 4.0f, COLOR_GREEN);
+    draw_text("Panel principal", 50, 139, 14, COLOR_TEXT);
+
+    draw_text("SISTEMA", 24, 196, 11, COLOR_MUTED);
+    DrawCircle(34, 232, 4.0f, COLOR_CYAN);
+    draw_text("Pack de bateria", 50, 224, 14, COLOR_TEXT);
+    DrawCircle(34, 270, 4.0f, COLOR_MUTED);
+    draw_text("Celdas y sensores", 50, 262, 14, COLOR_MUTED);
+    DrawCircle(34, 308, 4.0f, COLOR_MUTED);
+    draw_text("Historial", 50, 300, 14, COLOR_MUTED);
+
+    const float footer_y = (float)screen_height - 100.0f;
+    DrawLine(24, (int)footer_y, 196, (int)footer_y, COLOR_BORDER);
+    DrawCircle(34, (int)footer_y + 28, 4.0f, COLOR_GREEN);
+    draw_text("Fuente activa", 50, (int)footer_y + 19, 12, COLOR_MUTED);
+    draw_text("Simulador local", 50, (int)footer_y + 39, 13, COLOR_TEXT);
+}
+
 static bool export_history_csv(const history_t *history, char *error, size_t error_size)
 {
     FILE *file = fopen("historial_simulado.csv", "w");
@@ -415,21 +465,22 @@ static bool export_history_csv(const history_t *history, char *error, size_t err
     return true;
 }
 
-static uint8_t draw_header(int screen_width, uint8_t pack_id, const char *status,
+static uint8_t draw_header(int screen_width, int content_x, uint8_t pack_id,
+                           const char *status,
                            bool status_error, bool *export_clicked)
 {
-    draw_text("App LiFePO4", 28, 22, 29, COLOR_TEXT);
-    draw_text("Monitor de solo lectura  |  Fuente: SIMULADOR",
-              29, 56, 13, COLOR_MUTED);
+    draw_text("Resumen del sistema", content_x, 20, 26, COLOR_TEXT);
+    draw_text("Monitor de bateria  /  Modo demostracion - sin conexion al BMS",
+              content_x, 53, 13, COLOR_MUTED);
 
-    const float control_y = 24.0f;
+    const float control_y = 28.0f;
     const float button_h = 36.0f;
     const float export_w = 118.0f;
     const float pack_w = 76.0f;
     const float gap = 8.0f;
     const float start_x = (float)screen_width - 28.0f -
                           export_w - 2.0f * (pack_w + gap) - 2.0f * gap;
-    draw_text("PACK", (int)start_x - 48, (int)control_y + 10, 12, COLOR_MUTED);
+    draw_text("PACK", (int)start_x - 43, (int)control_y + 11, 11, COLOR_MUTED);
 
     const bool select_100 = button(
         (Rectangle){ start_x, control_y, pack_w, button_h },
@@ -443,7 +494,7 @@ static uint8_t draw_header(int screen_width, uint8_t pack_id, const char *status
         "Exportar CSV", false, COLOR_CYAN);
 
     const Color status_color = status_error ? COLOR_RED : COLOR_MUTED;
-    draw_text(status, 29, 79, 12, status_color);
+    draw_text(status, content_x, 79, 12, status_color);
     if (select_100 && pack_id != 1) return 1;
     if (select_335 && pack_id != 2) return 2;
     return 0;
@@ -471,9 +522,19 @@ int main(void)
     append_sample(&history, &latest_data);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(1280, 820, "App LiFePO4 - Monitor simulado");
-    SetWindowMinSize(1000, 700);
+    InitWindow(1360, 860, "DAZI Solar | Monitor LiFePO4");
+    SetWindowMinSize(1120, 740);
     SetTargetFPS(60);
+
+    Texture2D logo = { 0 };
+    bool logo_loaded = false;
+    if (FileExists("assets/dazi-solar-logo.png")) {
+        logo = LoadTexture("assets/dazi-solar-logo.png");
+        logo_loaded = logo.id != 0;
+    }
+    if (!logo_loaded) {
+        fprintf(stderr, "No se pudo cargar assets/dazi-solar-logo.png; se usara texto alternativo.\n");
+    }
 
     while (!WindowShouldClose()) {
         const float frame_time = GetFrameTime();
@@ -495,11 +556,12 @@ int main(void)
 
         const int screen_width = GetScreenWidth();
         const int screen_height = GetScreenHeight();
-        const float margin = 28.0f;
+        const float sidebar_width = 220.0f;
+        const float margin = sidebar_width + 28.0f;
         const float gap = 14.0f;
-        const float content_width = (float)screen_width - 2.0f * margin;
-        const float top_y = 112.0f;
-        const float top_h = 130.0f;
+        const float content_width = (float)screen_width - margin - 28.0f;
+        const float top_y = 116.0f;
+        const float top_h = 128.0f;
         const float top_w = (content_width - 2.0f * gap) / 3.0f;
         const float metrics_y = top_y + top_h + 12.0f;
         const float metrics_h = 92.0f;
@@ -514,8 +576,10 @@ int main(void)
 
         BeginDrawing();
         ClearBackground(COLOR_BACKGROUND);
+        draw_sidebar(screen_height, logo, logo_loaded);
         bool export_clicked = false;
-        const uint8_t requested_pack = draw_header(screen_width, selected_pack, status,
+        const uint8_t requested_pack = draw_header(screen_width, (int)margin,
+                                                   selected_pack, status,
                                                    status_error, &export_clicked);
 
         char voltage[40];
@@ -583,6 +647,9 @@ int main(void)
         EndDrawing();
     }
 
+    if (logo_loaded) {
+        UnloadTexture(logo);
+    }
     CloseWindow();
     return 0;
 }

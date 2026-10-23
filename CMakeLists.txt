@@ -30,6 +30,13 @@ if(BUILD_DESKTOP)
     )
 
     target_link_libraries(lifepo4-desktop PRIVATE lifepo4-core raylib)
+
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/assets")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/dazi-solar-logo.png"
+        "${CMAKE_CURRENT_BINARY_DIR}/assets/dazi-solar-logo.png"
+        COPYONLY
+    )
 endif()
 
 include(CTest)
