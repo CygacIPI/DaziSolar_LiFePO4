@@ -10,7 +10,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-find_package(raylib CONFIG REQUIRED)
+option(BUILD_DESKTOP "Build the raylib desktop application" ON)
 
 add_library(lifepo4-core STATIC
     core/src/battery.c
@@ -22,11 +22,15 @@ add_library(lifepo4-core STATIC
 
 target_include_directories(lifepo4-core PUBLIC core/include)
 
-add_executable(lifepo4-desktop
-    desktop/main.c
-)
+if(BUILD_DESKTOP)
+    find_package(raylib CONFIG REQUIRED)
 
-target_link_libraries(lifepo4-desktop PRIVATE lifepo4-core raylib)
+    add_executable(lifepo4-desktop
+        desktop/main.c
+    )
+
+    target_link_libraries(lifepo4-desktop PRIVATE lifepo4-core raylib)
+endif()
 
 include(CTest)
 

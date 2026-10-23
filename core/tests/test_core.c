@@ -37,6 +37,9 @@ static battery_data_t reference_battery(void)
     data.remaining_mAh = 68870;
     data.nominal_mAh = 100000;
     data.cell_count = 16;
+    for (uint8_t i = 0; i < data.cell_count; ++i) {
+        data.cell_mV[i] = (i < 11) ? 3332 : 3333;
+    }
     data.temp_count = 1;
     data.temp_dC[0] = 250;
     data.source = BATTERY_SOURCE_SIMULATOR;
@@ -114,11 +117,30 @@ static void test_data_validation(void)
     battery_data_t data = reference_battery();
 
     CHECK(battery_data_is_valid(&data));
+    CHECK(battery_validate_data(NULL) == BATTERY_DATA_INVALID_NULL);
     data.pack_id = 0;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_PACK_ID);
     CHECK(!battery_data_is_valid(&data));
     data = reference_battery();
     data.cell_count = BATTERY_MAX_CELLS + 1;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_CELL_COUNT);
     CHECK(!battery_data_is_valid(&data));
+    data = reference_battery();
+    data.temp_count = BATTERY_MAX_TEMPERATURES + 1;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_TEMPERATURE_COUNT);
+    data = reference_battery();
+    data.source = BATTERY_SOURCE_CAN + 1;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_SOURCE);
+    data = reference_battery();
+    data.remaining_mAh = data.nominal_mAh + 1;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_CAPACITY);
+    data = reference_battery();
+    data.cell_mV[3] = 0;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_CELL_VOLTAGE);
+    data = reference_battery();
+    data.nominal_mAh = 0;
+    data.remaining_mAh = 1000;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
 }
 
 static void test_simulator(void)

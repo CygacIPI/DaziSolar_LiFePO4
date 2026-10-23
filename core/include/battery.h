@@ -64,6 +64,19 @@ typedef struct {
     double soc_pct;
 } battery_coulomb_counter_t;
 
+typedef enum {
+    BATTERY_DATA_VALID = 0,
+    BATTERY_DATA_INVALID_NULL,
+    BATTERY_DATA_INVALID_PACK_ID,
+    BATTERY_DATA_INVALID_SOC,
+    BATTERY_DATA_INVALID_CELL_COUNT,
+    BATTERY_DATA_INVALID_TEMPERATURE_COUNT,
+    BATTERY_DATA_INVALID_SOURCE,
+    BATTERY_DATA_INVALID_CAPACITY,
+    BATTERY_DATA_INVALID_CELL_VOLTAGE
+} battery_data_validation_t;
+
+battery_data_validation_t battery_validate_data(const battery_data_t *data);
 bool battery_data_is_valid(const battery_data_t *data);
 bool battery_calculate(const battery_data_t *data,
                        uint8_t depth_of_discharge_pct,
