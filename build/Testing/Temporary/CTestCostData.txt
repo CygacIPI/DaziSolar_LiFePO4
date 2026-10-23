@@ -1,2 +1,2 @@
-core-tests 4 0.00745373
+core-tests 6 0.0049742
 ---

@@ -23,6 +23,9 @@ AppLiFePO4_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 AppLiFePO4_SOURCE_DIR:STATIC=C:/Users/DELL/Documents/DaziSolar_LiFePO4
 
+//Build the raylib desktop application
+BUILD_DESKTOP:BOOL=ON
+
 //Build the testing tree.
 BUILD_TESTING:BOOL=ON
 

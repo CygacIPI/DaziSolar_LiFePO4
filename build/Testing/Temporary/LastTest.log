@@ -1,10 +1,10 @@
-Start testing: Oct 23 09:22 Hora est¨¢ndar oeste, Sudam¨¦rica
+Start testing: Oct 23 09:57 Hora est¨¢ndar oeste, Sudam¨¦rica
 ----------------------------------------------------------
 1/1 Testing: core-tests
 1/1 Test: core-tests
 Command: "C:/Users/DELL/Documents/DaziSolar_LiFePO4/build/core-tests.exe"
 Directory: C:/Users/DELL/Documents/DaziSolar_LiFePO4/build
-"core-tests" start time: Oct 23 09:22 Hora est¨¢ndar oeste, Sudam¨¦rica
+"core-tests" start time: Oct 23 09:57 Hora est¨¢ndar oeste, Sudam¨¦rica
 Output:
 ----------------------------------------------------------
 Todas las pruebas del nucleo pasaron.
@@ -12,8 +12,8 @@ Todas las pruebas del nucleo pasaron.
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"core-tests" end time: Oct 23 09:22 Hora est¨¢ndar oeste, Sudam¨¦rica
+"core-tests" end time: Oct 23 09:57 Hora est¨¢ndar oeste, Sudam¨¦rica
 "core-tests" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Oct 23 09:22 Hora est¨¢ndar oeste, Sudam¨¦rica
+End testing: Oct 23 09:57 Hora est¨¢ndar oeste, Sudam¨¦rica
