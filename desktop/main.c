@@ -21,6 +21,11 @@ static const Color COLOR_AMBER = { 204, 143, 42, 255 };
 static const Color COLOR_RED = { 194, 73, 65, 255 };
 static const Color COLOR_SIDEBAR = { 255, 255, 255, 255 };
 
+static Font UI_FONT;
+static Font UI_FONT_BOLD;
+static bool UI_FONT_LOADED;
+static bool UI_FONT_BOLD_LOADED;
+
 typedef struct {
     battery_data_t data;
     time_t timestamp;
@@ -33,7 +38,66 @@ typedef struct {
 
 static void draw_text(const char *text, int x, int y, int size, Color color)
 {
-    DrawText(text, x, y, size, color);
+    if (UI_FONT_LOADED) {
+        DrawTextEx(UI_FONT, text, (Vector2){ (float)x, (float)y },
+                   (float)size, 0.5f, color);
+    } else {
+        DrawText(text, x, y, size, color);
+    }
+}
+
+static void draw_text_bold(const char *text, int x, int y, int size, Color color)
+{
+    if (UI_FONT_BOLD_LOADED) {
+        DrawTextEx(UI_FONT_BOLD, text, (Vector2){ (float)x, (float)y },
+                   (float)size, 0.5f, color);
+    } else {
+        draw_text(text, x, y, size, color);
+    }
+}
+
+static float measure_text_width(const char *text, int size)
+{
+    if (UI_FONT_LOADED) {
+        return MeasureTextEx(UI_FONT, text, (float)size, 0.5f).x;
+    }
+    return (float)MeasureText(text, size);
+}
+
+static bool load_ui_fonts(void)
+{
+    const char *regular_paths[] = {
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/arial.ttf"
+    };
+    const char *bold_paths[] = {
+        "C:/Windows/Fonts/segoeuib.ttf",
+        "C:/Windows/Fonts/arialbd.ttf"
+    };
+
+    for (size_t i = 0; i < sizeof(regular_paths) / sizeof(regular_paths[0]); ++i) {
+        if (FileExists(regular_paths[i])) {
+            UI_FONT = LoadFontEx(regular_paths[i], 64, NULL, 0);
+            if (UI_FONT.texture.id != 0) {
+                UI_FONT_LOADED = true;
+                SetTextureFilter(UI_FONT.texture, TEXTURE_FILTER_BILINEAR);
+                break;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < sizeof(bold_paths) / sizeof(bold_paths[0]); ++i) {
+        if (FileExists(bold_paths[i])) {
+            UI_FONT_BOLD = LoadFontEx(bold_paths[i], 64, NULL, 0);
+            if (UI_FONT_BOLD.texture.id != 0) {
+                UI_FONT_BOLD_LOADED = true;
+                SetTextureFilter(UI_FONT_BOLD.texture, TEXTURE_FILTER_BILINEAR);
+                break;
+            }
+        }
+    }
+
+    return UI_FONT_LOADED;
 }
 
 static void draw_panel(Rectangle bounds)
@@ -55,7 +119,7 @@ static bool button(Rectangle bounds, const char *label, bool selected, Color acc
 
     DrawRectangleRec(bounds, fill);
     DrawRectangleLinesEx(bounds, 1.0f, selected ? accent : COLOR_BORDER);
-    const int label_width = MeasureText(label, 15);
+    const int label_width = (int)measure_text_width(label, 15);
     draw_text(label, (int)(bounds.x + (bounds.width - label_width) / 2),
               (int)(bounds.y + (bounds.height - 15) / 2), 15, text);
     return pressed;
@@ -67,7 +131,7 @@ static void draw_metric_card(Rectangle bounds, const char *title,
 {
     draw_panel(bounds);
     draw_text(title, (int)bounds.x + 16, (int)bounds.y + 13, 13, COLOR_MUTED);
-    draw_text(value, (int)bounds.x + 16, (int)bounds.y + 35, 24, accent);
+    draw_text_bold(value, (int)bounds.x + 16, (int)bounds.y + 35, 24, accent);
     if (detail != NULL) {
         draw_text(detail, (int)bounds.x + 16, (int)bounds.y + 68, 12, COLOR_MUTED);
     }
@@ -87,7 +151,7 @@ static void draw_energy_card(Rectangle bounds,
     draw_panel(bounds);
     draw_text("ENERGIA ALMACENADA", (int)bounds.x + 18, (int)bounds.y + 14,
               13, COLOR_MUTED);
-    draw_text(energy, (int)bounds.x + 18, (int)bounds.y + 37, 32, COLOR_CYAN);
+    draw_text_bold(energy, (int)bounds.x + 18, (int)bounds.y + 37, 32, COLOR_CYAN);
     draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 94, 12, COLOR_MUTED);
 }
 
@@ -103,7 +167,7 @@ static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
     draw_panel(bounds);
     draw_text("ESTADO DE CARGA", (int)bounds.x + 18, (int)bounds.y + 14,
               14, COLOR_MUTED);
-    draw_text(percent, (int)bounds.x + 18, (int)bounds.y + 36, 33, COLOR_GREEN);
+    draw_text_bold(percent, (int)bounds.x + 18, (int)bounds.y + 36, 33, COLOR_GREEN);
     const Rectangle bar = { bounds.x + 18, bounds.y + 83, bounds.width - 36, 13 };
     DrawRectangleRec(bar, COLOR_PANEL_LIGHT);
     Rectangle fill = bar;
@@ -131,7 +195,7 @@ static void draw_runtime_card(Rectangle bounds,
     draw_panel(bounds);
     draw_text("AUTONOMIA ESTIMADA", (int)bounds.x + 18, (int)bounds.y + 14,
               14, COLOR_MUTED);
-    draw_text(runtime, (int)bounds.x + 18, (int)bounds.y + 38, 33, COLOR_AMBER);
+    draw_text_bold(runtime, (int)bounds.x + 18, (int)bounds.y + 38, 33, COLOR_AMBER);
     draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 91, 12, COLOR_MUTED);
 }
 
@@ -150,7 +214,7 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
     char delta[48];
     snprintf(delta, sizeof(delta), "Diferencia max.: %u mV",
              data->cell_count > 0 ? (unsigned)(maximum - minimum) : 0u);
-    const int delta_width = MeasureText(delta, 12);
+    const int delta_width = (int)measure_text_width(delta, 12);
     draw_text(delta, (int)(bounds.x + bounds.width - delta_width - 18),
               (int)bounds.y + 16, 12, COLOR_CYAN);
 
@@ -333,7 +397,7 @@ static void draw_sidebar(int screen_height, Texture2D logo, bool logo_loaded)
         DrawTexturePro(logo, source, destination, (Vector2){ 0.0f, 0.0f },
                        0.0f, WHITE);
     } else {
-        draw_text("DAZI SOLAR", 24, 31, 22, COLOR_TEXT);
+        draw_text_bold("DAZI SOLAR", 24, 31, 22, COLOR_TEXT);
     }
     DrawLine(24, 78, 196, 78, COLOR_BORDER);
 
@@ -469,7 +533,7 @@ static uint8_t draw_header(int screen_width, int content_x, uint8_t pack_id,
                            const char *status,
                            bool status_error, bool *export_clicked)
 {
-    draw_text("Resumen del sistema", content_x, 20, 26, COLOR_TEXT);
+    draw_text_bold("Resumen del sistema", content_x, 20, 26, COLOR_TEXT);
     draw_text("Monitor de bateria  /  Modo demostracion - sin conexion al BMS",
               content_x, 53, 13, COLOR_MUTED);
 
@@ -528,6 +592,9 @@ int main(void)
 
     Texture2D logo = { 0 };
     bool logo_loaded = false;
+    if (!load_ui_fonts()) {
+        fprintf(stderr, "No se pudo cargar Segoe UI ni Arial; se usara la fuente integrada de raylib.\n");
+    }
     if (FileExists("assets/dazi-solar-logo.png")) {
         logo = LoadTexture("assets/dazi-solar-logo.png");
         logo_loaded = logo.id != 0;
@@ -649,6 +716,12 @@ int main(void)
 
     if (logo_loaded) {
         UnloadTexture(logo);
+    }
+    if (UI_FONT_LOADED) {
+        UnloadFont(UI_FONT);
+    }
+    if (UI_FONT_BOLD_LOADED) {
+        UnloadFont(UI_FONT_BOLD);
     }
     CloseWindow();
     return 0;
