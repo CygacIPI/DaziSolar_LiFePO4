@@ -113,6 +113,25 @@ static void test_data_validation(void)
     data.remaining_mAh = data.nominal_mAh + 1;
     CHECK(battery_validate_data(&data) == BATTERY_DATA_INVALID_CAPACITY);
     data = reference_battery();
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
+    data.soc_pct = 69;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
+    data = reference_battery();
+    data.soc_pct = 69;
+    data.remaining_mAh = 68000;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
+    data.soc_pct = 70;
+    CHECK(battery_validate_data(&data) ==
+          BATTERY_DATA_INVALID_SOC_CAPACITY_MISMATCH);
+    data = reference_battery();
+    data.valid_fields &= ~(uint32_t)BATTERY_FIELD_SOC;
+    data.soc_pct = 0;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
+    data.valid_fields &= ~(uint32_t)BATTERY_FIELD_REMAINING_CAPACITY;
+    data.remaining_mAh = 0;
+    CHECK(battery_validate_data(&data) == BATTERY_DATA_VALID);
+
+    data = reference_battery();
     data.valid_fields &= ~(uint32_t)BATTERY_FIELD_NOMINAL_CAPACITY;
     data.nominal_mAh = 0;
     data.remaining_mAh = 1000;
@@ -187,6 +206,8 @@ static void test_alarm_thresholds_and_profiles(void)
 
     CHECK(battery_alarm_config_for_capacity(100000, &config));
     CHECK(config.thresholds_are_provisional);
+    CHECK(config.current_limits_available);
+    battery_alarm_assessment_t assessment;
 
     data.voltage_mV = 43200;
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_LOW) == 0);
@@ -194,14 +215,30 @@ static void test_alarm_thresholds_and_profiles(void)
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_LOW) != 0);
     data.voltage_mV = 57600;
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_HIGH) == 0);
+    data.current_mA = 1;
+    CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_HIGH) == 0);
     data.voltage_mV = 57601;
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_HIGH) != 0);
-
     data.voltage_mV = 58400;
-    data.current_mA = 1;
+    CHECK((evaluate_alarms(&data) & BATTERY_ALARM_VOLTAGE_HIGH) != 0);
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_CHARGE_VOLTAGE_HIGH) == 0);
+
     data.voltage_mV = 58401;
-    CHECK((evaluate_alarms(&data) & BATTERY_ALARM_CHARGE_VOLTAGE_HIGH) != 0);
+    alarms = evaluate_alarms(&data);
+    CHECK((alarms & BATTERY_ALARM_CHARGE_VOLTAGE_HIGH) != 0);
+    CHECK((alarms & BATTERY_ALARM_VOLTAGE_HIGH) == 0);
+    data.current_mA = -1;
+    alarms = evaluate_alarms(&data);
+    CHECK((alarms & BATTERY_ALARM_VOLTAGE_HIGH) != 0);
+    CHECK((alarms & BATTERY_ALARM_CHARGE_VOLTAGE_HIGH) == 0);
+    data.valid_fields &= ~(uint32_t)BATTERY_FIELD_CURRENT;
+    data.current_mA = 0;
+    CHECK(battery_assess_alarms(&data, &assessment));
+    CHECK(!assessment.current_limit_evaluable);
+    alarms = assessment.active_alarms;
+    CHECK((alarms & BATTERY_ALARM_VOLTAGE_HIGH) != 0);
+    CHECK((alarms & BATTERY_ALARM_CHARGE_VOLTAGE_HIGH) == 0);
+    data.valid_fields |= BATTERY_FIELD_CURRENT;
 
     data.voltage_mV = 53317;
     data.current_mA = 100000;
@@ -213,6 +250,16 @@ static void test_alarm_thresholds_and_profiles(void)
     data.current_mA = -100001;
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_DISCHARGE_CURRENT_HIGH) != 0);
 
+    data.voltage_mV = 43199;
+    data.current_mA = 1;
+    data.temp_dC[0] = -1;
+    data.current_mA = 100001;
+    alarms = evaluate_alarms(&data);
+    CHECK((alarms & BATTERY_ALARM_VOLTAGE_LOW) != 0);
+    CHECK((alarms & BATTERY_ALARM_CHARGE_TEMPERATURE) != 0);
+    CHECK((alarms & BATTERY_ALARM_CHARGE_CURRENT_HIGH) != 0);
+
+    data.voltage_mV = 53317;
     data.current_mA = 1;
     data.temp_dC[0] = 0;
     CHECK((evaluate_alarms(&data) & BATTERY_ALARM_CHARGE_TEMPERATURE) == 0);
@@ -237,18 +284,68 @@ static void test_alarm_thresholds_and_profiles(void)
     data.valid_fields &= ~(uint32_t)BATTERY_FIELD_CURRENT;
     data.current_mA = 0;
     data.temp_dC[0] = -201;
-    CHECK((evaluate_alarms(&data) & BATTERY_ALARM_DISCHARGE_TEMPERATURE) == 0);
+    CHECK(battery_assess_alarms(&data, &assessment));
+    CHECK(!assessment.current_limit_evaluable);
+    CHECK((assessment.active_alarms &
+           BATTERY_ALARM_DISCHARGE_TEMPERATURE) == 0);
 
     CHECK(battery_alarm_config_for_capacity(335000, &config));
+    CHECK(config.current_limits_available);
     data = reference_battery();
     data.nominal_mAh = 335000;
     data.remaining_mAh = 200000;
+    data.soc_pct = 60;
     data.current_mA = 200000;
     CHECK(battery_evaluate_alarms_with_config(&data, &config, &alarms));
     CHECK((alarms & BATTERY_ALARM_CHARGE_CURRENT_HIGH) == 0);
     data.current_mA = 200001;
     CHECK(battery_evaluate_alarms_with_config(&data, &config, &alarms));
     CHECK((alarms & BATTERY_ALARM_CHARGE_CURRENT_HIGH) != 0);
+
+    const uint32_t unsupported_capacities[] = {0, 120000};
+    for (size_t i = 0;
+         i < sizeof(unsupported_capacities) / sizeof(unsupported_capacities[0]);
+         ++i)
+    {
+        CHECK(battery_alarm_config_for_capacity(unsupported_capacities[i],
+                                                &config));
+        CHECK(!config.current_limits_available);
+        CHECK(config.maximum_charge_current_mA == 0);
+        CHECK(config.maximum_discharge_current_mA == 0);
+        data = reference_battery();
+        if (unsupported_capacities[i] == 0)
+        {
+            data.valid_fields &= ~(uint32_t)BATTERY_FIELD_NOMINAL_CAPACITY;
+            data.nominal_mAh = 0;
+        }
+        else
+        {
+            data.nominal_mAh = unsupported_capacities[i];
+            data.remaining_mAh = unsupported_capacities[i] * 68u / 100u;
+        }
+        data.current_mA = 1000000;
+        CHECK(battery_assess_alarms_with_config(&data, &config, &assessment));
+        CHECK(!assessment.current_limit_evaluable);
+        CHECK((assessment.active_alarms &
+               BATTERY_ALARM_CHARGE_CURRENT_HIGH) == 0);
+        CHECK(battery_assess_alarms(&data, &assessment));
+        CHECK(!assessment.current_limit_evaluable);
+        CHECK(!battery_evaluate_alarms(&data, &alarms));
+        data.voltage_mV = 57601;
+        CHECK(battery_assess_alarms_with_config(&data, &config, &assessment));
+        CHECK((assessment.active_alarms & BATTERY_ALARM_VOLTAGE_HIGH) != 0);
+    }
+
+    CHECK(battery_alarm_config_for_capacity(100000, &config));
+    data = reference_battery();
+    CHECK(battery_assess_alarms_with_config(&data, &config, &assessment));
+    CHECK(assessment.current_limit_evaluable);
+    data.valid_fields &= ~(uint32_t)BATTERY_FIELD_CURRENT;
+    data.current_mA = 0;
+    CHECK(battery_assess_alarms_with_config(&data, &config, &assessment));
+    CHECK(!assessment.current_limit_evaluable);
+    CHECK(!battery_evaluate_alarms(&data, &alarms));
+
     config.maximum_voltage_mV = config.minimum_voltage_mV;
     CHECK(!battery_evaluate_alarms_with_config(&data, &config, &alarms));
     CHECK(alarms == BATTERY_ALARM_NONE);
@@ -295,13 +392,22 @@ static void test_coulomb_counter(void)
 static void test_simulator_sequences(void)
 {
     battery_simulator_t simulator;
+    battery_simulator_t stepped_simulator;
     battery_data_t data;
-    uint32_t previous_remaining;
-    uint8_t previous_soc;
+    battery_data_t stepped_data;
 
     CHECK(!battery_simulator_init(&simulator, 0, 100000));
     CHECK(!battery_simulator_init(&simulator, 1, 0));
     CHECK(battery_simulator_init(&simulator, 1, 100000));
+    const double initial_capacity = simulator.coulomb_counter.remaining_mAh;
+    const uint32_t initial_tick = simulator.tick;
+    CHECK(battery_simulator_step(&simulator, 0, &data));
+    CHECK(data.current_mA == -12000);
+    CHECK(simulator.current_pattern_index == 0);
+    CHECK(simulator.pattern_elapsed_ms == 0);
+    CHECK(simulator.tick == initial_tick);
+    CHECK(simulator.coulomb_counter.remaining_mAh == initial_capacity);
+
     CHECK(battery_simulator_next(&simulator, &data));
     CHECK(battery_data_is_valid(&data));
     CHECK(data.valid_fields == BATTERY_KNOWN_FIELDS);
@@ -309,8 +415,6 @@ static void test_simulator_sequences(void)
     CHECK(data.voltage_mV == 53317);
     CHECK(data.remaining_mAh == 67997);
     CHECK(data.soc_pct == 68);
-    previous_remaining = data.remaining_mAh;
-    previous_soc = data.soc_pct;
 
     uint32_t cell_sum = 0;
     for (uint8_t i = 0; i < data.cell_count; ++i)
@@ -319,21 +423,96 @@ static void test_simulator_sequences(void)
     }
     CHECK(cell_sum == data.voltage_mV);
 
-    CHECK(battery_simulator_step(&simulator, 3600000, &data));
+    CHECK(battery_simulator_init(&simulator, 1, 100000));
+    CHECK(battery_simulator_step(&simulator, 2500, &data));
     CHECK(data.current_mA == -8000);
-    CHECK(data.remaining_mAh < previous_remaining);
-    CHECK(data.soc_pct <= previous_soc);
+    CHECK(data.remaining_mAh == 67994);
+    CHECK(simulator.current_pattern_index == 2);
+    CHECK(simulator.pattern_elapsed_ms == 500);
+    CHECK(simulator.tick == 2);
+    const double capacity_after_2500_ms =
+        simulator.coulomb_counter.remaining_mAh;
 
-    CHECK(battery_simulator_step(&simulator, 3600000, &data));
+    CHECK(battery_simulator_step(&simulator, 500, &data));
     CHECK(data.current_mA == 0);
-    previous_remaining = data.remaining_mAh;
-    previous_soc = data.soc_pct;
-    CHECK(battery_simulator_step(&simulator, 3600000, &data));
-    CHECK(data.current_mA == 15000);
-    CHECK(data.remaining_mAh > previous_remaining);
-    CHECK(data.soc_pct >= previous_soc);
+    CHECK(simulator.current_pattern_index == 3);
+    CHECK(simulator.pattern_elapsed_ms == 0);
+    CHECK(simulator.tick == 3);
+    CHECK(simulator.coulomb_counter.remaining_mAh == capacity_after_2500_ms);
+
+    CHECK(battery_simulator_step(&simulator, 2000, &data));
+    CHECK(data.current_mA == 20000);
+    CHECK(data.remaining_mAh == 68006);
+    CHECK(simulator.current_pattern_index == 5);
+    CHECK(simulator.pattern_elapsed_ms == 0);
+    CHECK(simulator.tick == 5);
+    CHECK(battery_simulator_step(&simulator, 1000, &data));
+    CHECK(data.current_mA == 0);
+    CHECK(simulator.current_pattern_index == 0);
+    CHECK(simulator.tick == 6);
     CHECK(data.voltage_mV != 53317);
 
+    CHECK(battery_simulator_init(&simulator, 1, 100000));
+    CHECK(battery_simulator_init(&stepped_simulator, 1, 100000));
+    CHECK(battery_simulator_step(&simulator, 60000, &data));
+    for (size_t i = 0; i < 60; ++i)
+    {
+        CHECK(battery_simulator_next(&stepped_simulator, &stepped_data));
+    }
+    CHECK(simulator.current_pattern_index ==
+          stepped_simulator.current_pattern_index);
+    CHECK(simulator.pattern_elapsed_ms ==
+          stepped_simulator.pattern_elapsed_ms);
+    CHECK(simulator.tick == stepped_simulator.tick);
+    CHECK(nearly_equal(simulator.coulomb_counter.remaining_mAh,
+                       stepped_simulator.coulomb_counter.remaining_mAh,
+                       0.000001));
+    CHECK(data.remaining_mAh == stepped_data.remaining_mAh);
+    CHECK(data.current_mA == 3333);
+    CHECK(stepped_data.current_mA == 0);
+
+    const double boundary_capacities_mAh[] = {
+        0.0, 4.0, 99994.0, 99998.0};
+    for (size_t scenario = 0;
+         scenario < sizeof(boundary_capacities_mAh) /
+                        sizeof(boundary_capacities_mAh[0]);
+         ++scenario)
+    {
+        CHECK(battery_simulator_init(&simulator, 1, 100000));
+        CHECK(battery_simulator_init(&stepped_simulator, 1, 100000));
+        simulator.coulomb_counter.remaining_mAh =
+            boundary_capacities_mAh[scenario];
+        stepped_simulator.coulomb_counter.remaining_mAh =
+            boundary_capacities_mAh[scenario];
+        CHECK(battery_simulator_step(&simulator, 6000, &data));
+        for (size_t state = 0; state < 6; ++state)
+        {
+            CHECK(battery_simulator_next(&stepped_simulator, &stepped_data));
+        }
+        CHECK(nearly_equal(simulator.coulomb_counter.remaining_mAh,
+                           stepped_simulator.coulomb_counter.remaining_mAh,
+                           0.000001));
+        CHECK(simulator.current_pattern_index ==
+              stepped_simulator.current_pattern_index);
+    }
+
+    CHECK(battery_simulator_init(&simulator, 1, 100000));
+    CHECK(battery_simulator_step(&simulator, UINT32_MAX, &data));
+    CHECK(data.remaining_mAh == data.nominal_mAh);
+    CHECK(data.soc_pct == 100);
+    CHECK(simulator.current_pattern_index ==
+          (uint8_t)((UINT32_MAX / BATTERY_SIMULATOR_STATE_DURATION_MS) %
+                    6u));
+    CHECK(simulator.pattern_elapsed_ms ==
+          UINT32_MAX % BATTERY_SIMULATOR_STATE_DURATION_MS);
+
+    CHECK(battery_simulator_init(&simulator, 1, 100000));
+    simulator.coulomb_counter.remaining_mAh = NAN;
+    CHECK(!battery_simulator_step(&simulator, UINT32_MAX, &data));
+    CHECK(simulator.current_pattern_index == 0);
+    CHECK(simulator.pattern_elapsed_ms == 0);
+
+    CHECK(battery_simulator_init(&simulator, 1, 100000));
     for (size_t i = 0; i < 10000; ++i)
     {
         CHECK(battery_simulator_step(&simulator, 1000, &data));
@@ -357,14 +536,21 @@ static void test_simulator_sequences(void)
 
 static void test_csv_export(void)
 {
-    battery_csv_sample_t samples[2];
+    battery_csv_sample_t samples[3];
     memset(samples, 0, sizeof(samples));
     samples[0].timestamp_unix_s = 123456789;
     samples[0].data = reference_battery();
     samples[1].timestamp_unix_s = 123456790;
+    samples[1].data = reference_battery();
     samples[1].data.pack_id = 2;
+    samples[1].data.nominal_mAh = 335000;
+    samples[1].data.remaining_mAh = 200000;
+    samples[1].data.soc_pct = 60;
     samples[1].data.source = BATTERY_SOURCE_SIMULATOR;
-    samples[1].data.valid_fields = BATTERY_FIELD_PACK_ID;
+    samples[2].timestamp_unix_s = 123456791;
+    samples[2].data.pack_id = 2;
+    samples[2].data.source = BATTERY_SOURCE_SIMULATOR;
+    samples[2].data.valid_fields = BATTERY_FIELD_PACK_ID;
 
     FILE *file = tmpfile();
     CHECK(file != NULL);
@@ -374,7 +560,7 @@ static void test_csv_export(void)
     }
     CHECK(!battery_csv_write(NULL, samples, 2));
     CHECK(!battery_csv_write(file, NULL, 1));
-    CHECK(battery_csv_write(file, samples, 2));
+    CHECK(battery_csv_write(file, samples, 3));
     CHECK(fflush(file) == 0);
     CHECK(fseek(file, 0, SEEK_SET) == 0);
 
@@ -385,7 +571,8 @@ static void test_csv_export(void)
     CHECK(strstr(content, "voltage_mV") != NULL);
     CHECK(strstr(content, "temperature_8_dC") != NULL);
     CHECK(strstr(content, "123456789,1,0,0x000003FF,53317,-10000,68,68870") != NULL);
-    CHECK(strstr(content, "123456790,2,0,0x00000001,,,,,,,") != NULL);
+    CHECK(strstr(content, "123456790,2,0,0x000003FF,53317,-10000,60,200000,335000") != NULL);
+    CHECK(strstr(content, "123456791,2,0,0x00000001,,,,,,,") != NULL);
 
     battery_csv_sample_t invalid = samples[0];
     invalid.data.voltage_mV = 0;

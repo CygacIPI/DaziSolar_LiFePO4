@@ -8,6 +8,8 @@
 #define BATTERY_MAX_TEMPERATURES 8
 #define BATTERY_MIN_PACK_ID 1
 #define BATTERY_MAX_PACK_ID 15
+#define BATTERY_SOC_CAPACITY_TOLERANCE_PCT 1u
+#define BATTERY_SIMULATOR_STATE_DURATION_MS 1000u
 #define BATTERY_KNOWN_FIELDS ((uint32_t)((1u << 10) - 1u))
 #define BATTERY_ALARM_KNOWN_MASK UINT32_C(0x7f)
 
@@ -88,6 +90,7 @@ typedef struct
     uint32_t nominal_mAh;
     uint32_t tick;
     uint8_t current_pattern_index;
+    uint16_t pattern_elapsed_ms;
     battery_coulomb_counter_t coulomb_counter;
 } battery_simulator_t;
 
@@ -103,8 +106,15 @@ typedef struct
     int16_t maximum_discharge_temperature_dC;
     uint32_t maximum_charge_current_mA;
     uint32_t maximum_discharge_current_mA;
+    bool current_limits_available;
     bool thresholds_are_provisional;
 } battery_alarm_config_t;
+
+typedef struct
+{
+    uint32_t active_alarms;
+    bool current_limit_evaluable;
+} battery_alarm_assessment_t;
 
 typedef enum
 {
@@ -120,7 +130,8 @@ typedef enum
     BATTERY_DATA_INVALID_SOURCE,
     BATTERY_DATA_INVALID_CAPACITY,
     BATTERY_DATA_INVALID_CELL_VOLTAGE,
-    BATTERY_DATA_INVALID_UNKNOWN_ALARM
+    BATTERY_DATA_INVALID_UNKNOWN_ALARM,
+    BATTERY_DATA_INVALID_SOC_CAPACITY_MISMATCH
 } battery_data_validation_t;
 
 bool battery_has_field(const battery_data_t *data, battery_field_t field);
@@ -131,6 +142,13 @@ bool battery_calculate(const battery_data_t *data,
                        battery_calculations_t *calculations);
 bool battery_alarm_config_for_capacity(uint32_t nominal_mAh,
                                        battery_alarm_config_t *config);
+bool battery_assess_alarms_with_config(
+    const battery_data_t *data,
+    const battery_alarm_config_t *config,
+    battery_alarm_assessment_t *assessment);
+bool battery_assess_alarms(const battery_data_t *data,
+                           battery_alarm_assessment_t *assessment);
+/* Legacy wrappers return false when current-overlimit evaluation is unavailable. */
 bool battery_evaluate_alarms_with_config(const battery_data_t *data,
                                          const battery_alarm_config_t *config,
                                          uint32_t *alarms);
@@ -143,6 +161,11 @@ bool battery_coulomb_counter_update(battery_coulomb_counter_t *counter,
                                     uint32_t elapsed_milliseconds,
                                     uint32_t *remaining_mAh,
                                     uint8_t *estimated_soc_pct);
+bool battery_coulomb_counter_apply_charge_delta_mAh(
+    battery_coulomb_counter_t *counter,
+    double charge_delta_mAh,
+    uint32_t *remaining_mAh,
+    uint8_t *estimated_soc_pct);
 bool battery_simulator_init(battery_simulator_t *simulator,
                             uint8_t pack_id,
                             uint32_t nominal_mAh);

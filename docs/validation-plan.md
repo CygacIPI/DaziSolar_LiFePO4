@@ -20,11 +20,19 @@ Antes de conectar equipo real:
 - Rechazar tensiones de celda cero cuando el registro declara esa celda presente.
 - Mantener separados los datos estructuralmente invalidos y las mediciones fuera de los umbrales de operacion: una tension o temperatura fuera de rango puede ser una lectura valida que debe activar una alarma, no descartarse como desconocida. Los rangos de alarma actuales son provisionales y no constituyen una validacion del sensor.
 - No imponer un rango fisico universal adicional a las temperaturas hasta conocer las especificaciones del sensor BMS; validar por ahora presencia/conteo, rango representable y umbrales configurados.
+- Cuando SOC, capacidad restante y nominal estan disponibles, aceptar una diferencia de hasta 1 punto porcentual entre SOC y `100 x restante / nominal`; rechazar diferencias superiores. La tolerancia contempla la resolucion/redondeo y mantiene valido el ejemplo 68 % frente a 68,87 Ah. No evaluar la relacion si falta cualquiera de los tres campos.
 - Validar tamanos de trama, version, direccion, checksum/CRC y unidades unicamente segun el protocolo oficial.
 - Probar limites, campos truncados, datos invalidos, checksum incorrecto, campos opcionales ausentes y secuencias de reconexion mediante fixtures.
 - Conservar errores explicitos. No convertir tramas invalidas en muestras con aspecto de exito.
-- No exigir que SOC porcentual coincida exactamente con remaining capacity: redondeo y convenciones del BMS pueden diferir. Registrar ambas magnitudes.
+- Registrar SOC y capacidades en cada muestra. La tolerancia de software no demuestra la exactitud ni la convencion SOC del BMS; esta debe confirmarse con el protocolo/documentacion oficial y validacion experimental.
 - No exigir igualdad exacta entre tension del pack y suma de celdas: se necesita conocer la precision, sincronizacion y tolerancia del equipo antes de definir un criterio.
+
+### Alarmas de monitorizacion
+
+- Los limites de corriente solo estan configurados para capacidades nominales de 100.000 mAh y 335.000 mAh; esos valores y todos los umbrales siguen siendo provisionales.
+- Con capacidad desconocida o no admitida, `battery_assess_alarms()` continua evaluando los limites de tension/temperatura, pero informa `current_limit_evaluable = false`. No se interpreta la ausencia de alarma de corriente como confirmacion de que la corriente sea segura. La interfaz muestra esta condicion.
+- Los wrappers de compatibilidad `battery_evaluate_alarms*()` devuelven `false` cuando no es posible evaluar el limite de corriente. Para recuperar las alarmas que si pudieron evaluarse y el estado de evaluabilidad, usar `battery_assess_alarms*()`.
+- La alarma general de tension alta se activa por encima de 57.600 mV. Durante carga, una lectura por encima de 58.400 mV activa en su lugar la alarma especifica de tension alta de carga; ambas no se emiten a la vez. A 58.400 mV exactos solo aplica la alarma general (si se supera 57.600 mV). Son umbrales provisionales, no protecciones.
 
 ## Fase B: protocolo y banco de prueba
 

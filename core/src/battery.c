@@ -95,6 +95,25 @@ battery_data_validation_t battery_validate_data(const battery_data_t *data)
     {
         return BATTERY_DATA_INVALID_CAPACITY;
     }
+    if (battery_has_field(data, BATTERY_FIELD_SOC) &&
+        battery_has_field(data, BATTERY_FIELD_REMAINING_CAPACITY) &&
+        battery_has_field(data, BATTERY_FIELD_NOMINAL_CAPACITY))
+    {
+        const uint64_t soc_scaled =
+            (uint64_t)data->soc_pct * data->nominal_mAh;
+        const uint64_t capacity_scaled =
+            (uint64_t)data->remaining_mAh * 100u;
+        const uint64_t difference = soc_scaled > capacity_scaled
+                                        ? soc_scaled - capacity_scaled
+                                        : capacity_scaled - soc_scaled;
+        const uint64_t tolerance =
+            (uint64_t)data->nominal_mAh *
+            BATTERY_SOC_CAPACITY_TOLERANCE_PCT;
+        if (difference > tolerance)
+        {
+            return BATTERY_DATA_INVALID_SOC_CAPACITY_MISMATCH;
+        }
+    }
     if ((!battery_has_field(data, BATTERY_FIELD_REMAINING_CAPACITY) &&
          data->remaining_mAh != 0) ||
         (!battery_has_field(data, BATTERY_FIELD_NOMINAL_CAPACITY) &&

@@ -335,7 +335,7 @@ static const char *alarm_label(uint32_t alarm)
 static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
 {
     draw_panel(bounds);
-    draw_text("TEMPERATURAS Y ALARMAS", (int)bounds.x + 18,
+    draw_text("CONDICIONES (ALARMAS PROVISIONALES)", (int)bounds.x + 18,
               (int)bounds.y + 14, 14, COLOR_MUTED);
 
     char temperatures[64];
@@ -367,9 +367,22 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
     draw_text(temperatures, (int)bounds.x + 18, (int)bounds.y + 47,
               15, COLOR_TEXT);
 
-    const int alarm_y = (int)bounds.y + 83;
+    const int alarm_y = (int)bounds.y + 94;
     int alarm_row = 0;
     uint32_t known_alarms = 0;
+    battery_alarm_assessment_t assessment;
+    if (!battery_assess_alarms(data, &assessment))
+    {
+        draw_text("No se pudieron evaluar las condiciones",
+                  (int)bounds.x + 18, (int)bounds.y + 72, 13, COLOR_RED);
+        return;
+    }
+
+    if (!assessment.current_limit_evaluable)
+    {
+        draw_text("Sobrecorriente sin evaluar: falta corriente o limite configurado",
+                  (int)bounds.x + 18, (int)bounds.y + 70, 12, COLOR_AMBER);
+    }
     if (!battery_has_field(data, BATTERY_FIELD_ALARMS))
     {
         draw_text("Alarmas no disponibles", (int)bounds.x + 18,
@@ -415,7 +428,7 @@ static bool sample_power_W(const history_sample_t *sample, float *power_W)
 static void draw_power_chart(Rectangle bounds, const history_t *history)
 {
     draw_panel(bounds);
-    draw_text("POTENCIA EN TIEMPO REAL", (int)bounds.x + 18,
+    draw_text("POTENCIA ESTIMADA POR MUESTRA", (int)bounds.x + 18,
               (int)bounds.y + 12, 14, COLOR_MUTED);
     draw_text("Carga +  /  Descarga -", (int)bounds.x + 18,
               (int)bounds.y + 33, 12, COLOR_MUTED);
@@ -731,11 +744,7 @@ int main(void)
                 elapsed_ms >= (double)UINT32_MAX
                     ? UINT32_MAX
                     : (uint32_t)elapsed_ms;
-            if (elapsed_milliseconds == 0)
-            {
-                elapsed_milliseconds = 1000;
-            }
-            sample_timer = 0.0;
+            sample_timer -= (double)elapsed_milliseconds / 1000.0;
             if (!battery_simulator_step(&simulator, elapsed_milliseconds,
                                         &latest_data) ||
                 !battery_calculate(&latest_data, DO_D_PCT, &calculations))
@@ -844,18 +853,15 @@ int main(void)
                          "TENSION", voltage, "PACK_V simulado", COLOR_TEXT);
         draw_metric_card((Rectangle){margin + metric_w + gap, metrics_y,
                                      metric_w, metrics_h},
-                         "CORRIENTE", current,
+                         "CORRIENTE MEDIA", current,
                          !battery_has_field(&latest_data, BATTERY_FIELD_CURRENT)
                              ? "Desconocida"
-                             : (latest_data.current_mA > 0
-                                    ? "Carga simulada"
-                                    : (latest_data.current_mA < 0
-                                           ? "Descarga simulada"
-                                           : "En reposo")),
+                             : "Media del intervalo",
                          latest_data.current_mA > 0 ? COLOR_GREEN : COLOR_CYAN);
         draw_metric_card((Rectangle){margin + 2.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
-                         "POTENCIA", power, "V x I con signo", COLOR_AMBER);
+                         "POTENCIA ESTIMADA", power,
+                         "V x corriente media", COLOR_AMBER);
         draw_metric_card((Rectangle){margin + 3.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
                          "CICLOS", cycles, "Dato de ejemplo", COLOR_TEXT);

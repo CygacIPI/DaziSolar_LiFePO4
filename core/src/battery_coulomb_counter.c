@@ -25,19 +25,38 @@ bool battery_coulomb_counter_update(battery_coulomb_counter_t *counter,
 {
     if (counter == NULL ||
         remaining_mAh == NULL ||
-        estimated_soc_pct == NULL ||
-        counter->nominal_mAh == 0 ||
-        !isfinite(counter->remaining_mAh) ||
-        counter->remaining_mAh < 0.0 ||
-        counter->remaining_mAh > (double)counter->nominal_mAh)
+        estimated_soc_pct == NULL)
     {
         return false;
     }
 
     const double delta_mAh =
         (double)current_mA * (double)elapsed_milliseconds / 3600000.0;
-    const double next_remaining_mAh = counter->remaining_mAh + delta_mAh;
-    if (!isfinite(delta_mAh) || !isfinite(next_remaining_mAh))
+    return battery_coulomb_counter_apply_charge_delta_mAh(
+        counter, delta_mAh, remaining_mAh, estimated_soc_pct);
+}
+
+bool battery_coulomb_counter_apply_charge_delta_mAh(
+    battery_coulomb_counter_t *counter,
+    double charge_delta_mAh,
+    uint32_t *remaining_mAh,
+    uint8_t *estimated_soc_pct)
+{
+    if (counter == NULL ||
+        remaining_mAh == NULL ||
+        estimated_soc_pct == NULL ||
+        counter->nominal_mAh == 0 ||
+        !isfinite(counter->remaining_mAh) ||
+        counter->remaining_mAh < 0.0 ||
+        counter->remaining_mAh > (double)counter->nominal_mAh ||
+        !isfinite(charge_delta_mAh))
+    {
+        return false;
+    }
+
+    const double next_remaining_mAh =
+        counter->remaining_mAh + charge_delta_mAh;
+    if (!isfinite(next_remaining_mAh))
     {
         return false;
     }
