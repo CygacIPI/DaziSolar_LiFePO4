@@ -75,6 +75,48 @@ static float measure_text_width(const char *text, int size)
     return (float)MeasureText(text, size);
 }
 
+static void draw_text_fit(const char *text, int x, int y, int size,
+                          Color color, float max_width)
+{
+    if (text == NULL || max_width <= 0.0f)
+    {
+        return;
+    }
+
+    char visible[160];
+    const size_t length = strlen(text);
+    if (length >= sizeof(visible))
+    {
+        snprintf(visible, sizeof(visible), "%s", text);
+    }
+    else
+    {
+        memcpy(visible, text, length + 1);
+    }
+
+    if (measure_text_width(visible, size) > max_width)
+    {
+        size_t visible_length = strlen(visible);
+        while (visible_length > 3)
+        {
+            visible_length--;
+            visible[visible_length] = '\0';
+            if (visible_length > 3)
+            {
+                visible[visible_length - 1] = '.';
+                visible[visible_length - 2] = '.';
+                visible[visible_length - 3] = '.';
+                visible[visible_length] = '\0';
+            }
+            if (measure_text_width(visible, size) <= max_width)
+            {
+                break;
+            }
+        }
+    }
+    draw_text(visible, x, y, size, color);
+}
+
 static bool load_ui_fonts(void)
 {
     const char *regular_paths[] = {
@@ -157,7 +199,8 @@ static void draw_energy_card(Rectangle bounds,
                              const battery_calculations_t *calculations)
 {
     char energy[32];
-    char detail[96];
+    char nominal[48];
+    char usable[48];
     if (calculations->stored_energy_available)
     {
         snprintf(energy, sizeof(energy), "%.2f kWh",
@@ -169,21 +212,27 @@ static void draw_energy_card(Rectangle bounds,
     }
     if (calculations->nominal_energy_available)
     {
-        snprintf(detail, sizeof(detail),
-                 "Nominal %.2f kWh | util (DoD %d%%) %.2f kWh",
-                 calculations->nominal_energy_Wh / 1000.0, DO_D_PCT,
+        snprintf(nominal, sizeof(nominal), "Nominal %.2f kWh",
+                 calculations->nominal_energy_Wh / 1000.0);
+        snprintf(usable, sizeof(usable), "Util DoD %d%%: %.2f kWh", DO_D_PCT,
                  calculations->usable_nominal_energy_Wh / 1000.0);
     }
     else
     {
-        snprintf(detail, sizeof(detail), "Capacidad nominal desconocida");
+        snprintf(nominal, sizeof(nominal), "Capacidad nominal desconocida");
+        usable[0] = '\0';
     }
 
     draw_panel(bounds);
     draw_text("ENERGIA ALMACENADA", (int)bounds.x + 18, (int)bounds.y + 14,
               13, COLOR_MUTED);
     draw_text_bold(energy, (int)bounds.x + 18, (int)bounds.y + 37, 32, COLOR_CYAN);
-    draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 94, 12, COLOR_MUTED);
+    draw_text(nominal, (int)bounds.x + 18, (int)bounds.y + 88, 11, COLOR_MUTED);
+    if (usable[0] != '\0')
+    {
+        draw_text(usable, (int)bounds.x + 18, (int)bounds.y + 104, 11,
+                  COLOR_MUTED);
+    }
 }
 
 static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
@@ -216,14 +265,15 @@ static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
     draw_panel(bounds);
     draw_text("ESTADO DE CARGA", (int)bounds.x + 18, (int)bounds.y + 14,
               14, COLOR_MUTED);
-    draw_text_bold(percent, (int)bounds.x + 18, (int)bounds.y + 36, 33, COLOR_GREEN);
+    draw_text_bold(percent, (int)bounds.x + 18, (int)bounds.y + 36, 33,
+                   COLOR_CYAN);
     const Rectangle bar = {bounds.x + 18, bounds.y + 83, bounds.width - 36, 13};
     DrawRectangleRec(bar, COLOR_PANEL_LIGHT);
     Rectangle fill = bar;
     fill.width *= has_soc ? (float)data->soc_pct / 100.0f : 0.0f;
     if (fill.width > 0)
     {
-        DrawRectangleRec(fill, COLOR_GREEN);
+        DrawRectangleRec(fill, COLOR_CYAN);
     }
     draw_text(capacity, (int)bounds.x + 18, (int)bounds.y + 103, 12, COLOR_MUTED);
 }
@@ -248,7 +298,7 @@ static void draw_runtime_card(Rectangle bounds,
     draw_panel(bounds);
     draw_text("AUTONOMIA ESTIMADA", (int)bounds.x + 18, (int)bounds.y + 14,
               14, COLOR_MUTED);
-    draw_text_bold(runtime, (int)bounds.x + 18, (int)bounds.y + 38, 33, COLOR_AMBER);
+    draw_text_bold(runtime, (int)bounds.x + 18, (int)bounds.y + 38, 33, COLOR_CYAN);
     draw_text(detail, (int)bounds.x + 18, (int)bounds.y + 91, 12, COLOR_MUTED);
 }
 
@@ -261,6 +311,12 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
     if (!battery_has_field(data, BATTERY_FIELD_CELLS))
     {
         draw_text("Datos de celdas no disponibles", (int)bounds.x + 18,
+                  (int)bounds.y + 64, 15, COLOR_MUTED);
+        return;
+    }
+    if (data->cell_count == 0)
+    {
+        draw_text("Sin celdas reportadas", (int)bounds.x + 18,
                   (int)bounds.y + 64, 15, COLOR_MUTED);
         return;
     }
@@ -279,13 +335,16 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
              data->cell_count > 0 ? (unsigned)(maximum - minimum) : 0u);
     const int delta_width = (int)measure_text_width(delta, 12);
     draw_text(delta, (int)(bounds.x + bounds.width - (float)delta_width - 18.0f),
-              (int)bounds.y + 16, 12, COLOR_CYAN);
+              (int)bounds.y + 16, 12, COLOR_MUTED);
 
-    const int columns = data->cell_count > 8 ? 8 : data->cell_count;
-    const float gap = 8.0f;
+    const int columns = data->cell_count > 16 ? 8
+                        : data->cell_count > 4 ? 4
+                                               : data->cell_count;
+    const float gap = 6.0f;
     const float cell_width =
-        (bounds.width - 36.0f - gap * (float)(columns - 1)) / (float)columns;
-    const float cell_height = 52.0f;
+        (bounds.width - 36.0f - gap * (float)(columns - 1)) /
+        (float)columns;
+    const float cell_height = 34.0f;
     const float start_y = bounds.y + 48.0f;
 
     for (uint8_t i = 0; i < data->cell_count; ++i)
@@ -294,18 +353,19 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
         const int column = i % columns;
         const Rectangle cell = {
             bounds.x + 18.0f + (float)column * (cell_width + gap),
-            start_y + (float)row * (cell_height + 9.0f),
+            start_y + (float)row * (cell_height + 5.0f),
             cell_width,
             cell_height};
         char value[24];
         char label[12];
         snprintf(value, sizeof(value), "%.3f V",
                  (double)data->cell_mV[i] / 1000.0);
-        snprintf(label, sizeof(label), "CEL %u", (unsigned)(i + 1));
+        snprintf(label, sizeof(label), "CELDA %02u", (unsigned)(i + 1));
         DrawRectangleRec(cell, COLOR_PANEL_LIGHT);
         DrawRectangleLinesEx(cell, 1.0f, COLOR_BORDER);
-        draw_text(label, (int)cell.x + 7, (int)cell.y + 7, 10, COLOR_MUTED);
-        draw_text(value, (int)cell.x + 7, (int)cell.y + 26, 13, COLOR_TEXT);
+        draw_text(label, (int)cell.x + 8, (int)cell.y + 3, 10, COLOR_MUTED);
+        draw_text_bold(value, (int)cell.x + 8, (int)cell.y + 17, 13,
+                       COLOR_TEXT);
     }
 }
 
@@ -338,55 +398,74 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
     draw_text("CONDICIONES (ALARMAS PROVISIONALES)", (int)bounds.x + 18,
               (int)bounds.y + 14, 14, COLOR_MUTED);
 
-    char temperatures[64];
     if (!battery_has_field(data, BATTERY_FIELD_TEMPERATURES))
     {
-        snprintf(temperatures, sizeof(temperatures),
-                 "Temperaturas no disponibles");
+        draw_text("Temperaturas no disponibles", (int)bounds.x + 18,
+                  (int)bounds.y + 48, 13, COLOR_MUTED);
     }
     else if (data->temp_count == 0)
     {
-        snprintf(temperatures, sizeof(temperatures), "Sin datos de temperatura");
+        draw_text("Sin sensores reportados", (int)bounds.x + 18,
+                  (int)bounds.y + 48, 13, COLOR_MUTED);
     }
     else
     {
-        int used = snprintf(temperatures, sizeof(temperatures), "Temperaturas: ");
-        for (uint8_t i = 0; i < data->temp_count && used > 0 &&
-                            (size_t)used < sizeof(temperatures);
-             ++i)
+        const uint8_t sensors_per_row = 4;
+        for (uint8_t row = 0; row < 2; ++row)
         {
-            const int written = snprintf(
-                temperatures + used, sizeof(temperatures) - (size_t)used,
-                "%s%.1f C", i == 0 ? "" : " / ",
-                (double)data->temp_dC[i] / 10.0);
-            if (written < 0)
-                break;
-            used += written;
+            char temperatures[80] = "";
+            size_t used = 0;
+            const uint8_t first = (uint8_t)(row * sensors_per_row);
+            for (uint8_t i = first;
+                 i < data->temp_count && i < (uint8_t)(first + sensors_per_row);
+                 ++i)
+            {
+                const int written = snprintf(
+                    temperatures + used, sizeof(temperatures) - used,
+                    "%sT%u %.1f C", i == first ? "" : "  ",
+                    (unsigned)(i + 1), (double)data->temp_dC[i] / 10.0);
+                if (written < 0 ||
+                    (size_t)written >= sizeof(temperatures) - used)
+                {
+                    break;
+                }
+                used += (size_t)written;
+            }
+            if (used > 0)
+            {
+                draw_text(temperatures, (int)bounds.x + 18,
+                          (int)bounds.y + 46 + (int)row * 17, 12, COLOR_TEXT);
+            }
         }
     }
-    draw_text(temperatures, (int)bounds.x + 18, (int)bounds.y + 47,
-              15, COLOR_TEXT);
 
-    const int alarm_y = (int)bounds.y + 94;
+    const int alarm_y = (int)bounds.y + 96;
     int alarm_row = 0;
     uint32_t known_alarms = 0;
     battery_alarm_assessment_t assessment;
     if (!battery_assess_alarms(data, &assessment))
     {
         draw_text("No se pudieron evaluar las condiciones",
-                  (int)bounds.x + 18, (int)bounds.y + 72, 13, COLOR_RED);
+                  (int)bounds.x + 18, (int)bounds.y + 83, 12, COLOR_RED);
         return;
     }
 
     if (!assessment.current_limit_evaluable)
     {
-        draw_text("Sobrecorriente sin evaluar: falta corriente o limite configurado",
-                  (int)bounds.x + 18, (int)bounds.y + 70, 12, COLOR_AMBER);
+        draw_text("Sobrecorriente no evaluable: falta dato o perfil",
+                  (int)bounds.x + 18, (int)bounds.y + 82, 11, COLOR_AMBER);
+    }
+    else if (!battery_has_field(data, BATTERY_FIELD_VOLTAGE) ||
+             !battery_has_field(data, BATTERY_FIELD_TEMPERATURES) ||
+             data->temp_count == 0)
+    {
+        draw_text("Evaluacion incompleta: faltan tension o temperatura",
+                  (int)bounds.x + 18, (int)bounds.y + 82, 11, COLOR_AMBER);
     }
     if (!battery_has_field(data, BATTERY_FIELD_ALARMS))
     {
         draw_text("Alarmas no disponibles", (int)bounds.x + 18,
-                  alarm_y, 15, COLOR_MUTED);
+                  alarm_y, 13, COLOR_MUTED);
         return;
     }
     for (uint32_t bit = 1; bit <= BATTERY_ALARM_DISCHARGE_CURRENT_HIGH; bit <<= 1)
@@ -395,57 +474,138 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
             continue;
         known_alarms |= bit;
         draw_text(alarm_label(bit), (int)bounds.x + 18,
-                  alarm_y + alarm_row * 20, 14, COLOR_RED);
+                  alarm_y + alarm_row * 16, 12, COLOR_RED);
         alarm_row++;
     }
 
     if (known_alarms == 0)
     {
-        draw_text("Sin alarmas activas", (int)bounds.x + 18,
-                  alarm_y, 15, COLOR_GREEN);
+        const bool alarm_inputs_complete =
+            assessment.current_limit_evaluable &&
+            battery_has_field(data, BATTERY_FIELD_VOLTAGE) &&
+            battery_has_field(data, BATTERY_FIELD_TEMPERATURES) &&
+            data->temp_count > 0;
+        const char *message = alarm_inputs_complete
+                                  ? "Sin alarmas activas"
+                                  : "Sin alarmas detectadas; evaluacion incompleta";
+        draw_text(message, (int)bounds.x + 18, alarm_y,
+                  alarm_inputs_complete ? 13 : 11,
+                  alarm_inputs_complete ? COLOR_GREEN : COLOR_AMBER);
     }
 }
 
 static bool sample_power_W(const history_sample_t *sample, float *power_W)
 {
     if (sample == NULL || power_W == NULL ||
-        !battery_has_field(&sample->data, BATTERY_FIELD_VOLTAGE) ||
         !battery_has_field(&sample->data, BATTERY_FIELD_CURRENT))
     {
         return false;
     }
-    const double voltage_V = (double)sample->data.voltage_mV / 1000.0;
-    const double current_A = (double)sample->data.current_mA / 1000.0;
-    const double power = voltage_V * current_A;
-    if (!isfinite(power))
+    battery_calculations_t calculations;
+    if (!battery_calculate(&sample->data, DO_D_PCT, &calculations) ||
+        !calculations.power_available)
     {
         return false;
     }
-    *power_W = (float)power;
+    const double signed_power =
+        sample->data.current_mA < 0 ? -calculations.power_W
+                                    : calculations.power_W;
+    *power_W = (float)signed_power;
     return isfinite(*power_W);
+}
+
+static float chart_scale_for_power(float required)
+{
+    if (!isfinite(required) || required <= 0.0f)
+    {
+        return 100.0f;
+    }
+
+    const float exponent = floorf(log10f(required));
+    const float base = powf(10.0f, exponent);
+    const float normalized = required / base;
+    const float multiplier = normalized <= 1.0f ? 1.0f
+                             : normalized <= 2.0f ? 2.0f
+                             : normalized <= 5.0f ? 5.0f
+                                                  : 10.0f;
+    return multiplier * base;
+}
+
+static void format_chart_power(float power_W, char *text, size_t text_size)
+{
+    const float magnitude = fabsf(power_W);
+    if (magnitude < 0.0005f)
+    {
+        snprintf(text, text_size, "0 W");
+    }
+    else if (magnitude >= 1000.0f)
+    {
+        snprintf(text, text_size, "%+.1f kW", (double)(power_W / 1000.0f));
+    }
+    else if (magnitude >= 10.0f)
+    {
+        snprintf(text, text_size, "%+.0f W", (double)power_W);
+    }
+    else if (magnitude >= 1.0f)
+    {
+        snprintf(text, text_size, "%+.1f W", (double)power_W);
+    }
+    else
+    {
+        snprintf(text, text_size, "%+.0f mW", (double)(power_W * 1000.0f));
+    }
+}
+
+static void draw_time_label(time_t timestamp, int x, int y, Color color,
+                            bool center, bool align_right)
+{
+    struct tm *time_pointer = gmtime(&timestamp);
+    if (time_pointer == NULL)
+    {
+        return;
+    }
+    const struct tm utc = *time_pointer;
+    char label[16];
+    if (strftime(label, sizeof(label), "%H:%M:%S", &utc) == 0)
+    {
+        return;
+    }
+    const int label_width = (int)measure_text_width(label, 10);
+    const int label_x = center ? x - label_width / 2
+                               : align_right ? x - label_width : x;
+    draw_text(label, label_x, y, 10, color);
 }
 
 static void draw_power_chart(Rectangle bounds, const history_t *history)
 {
     draw_panel(bounds);
-    draw_text("POTENCIA ESTIMADA POR MUESTRA", (int)bounds.x + 18,
+    draw_text("POTENCIA ESTIMADA POR MUESTRA (UTC)", (int)bounds.x + 18,
               (int)bounds.y + 12, 14, COLOR_MUTED);
-    draw_text("Carga +  /  Descarga -", (int)bounds.x + 18,
-              (int)bounds.y + 33, 12, COLOR_MUTED);
 
     const Rectangle plot = {
-        bounds.x + 65,
-        bounds.y + 22,
-        bounds.width - 88,
-        bounds.height - 48};
+        bounds.x + 76,
+        bounds.y + 43,
+        bounds.width - 96,
+        bounds.height - 73};
     if (history->count < 2 || plot.width <= 0 || plot.height <= 0)
     {
         draw_text("Esperando muestras del simulador...",
-                  (int)plot.x + 12, (int)plot.y + 20, 14, COLOR_MUTED);
+                  (int)bounds.x + 18, (int)bounds.y + 58, 13, COLOR_MUTED);
         return;
     }
 
-    float max_abs = 100.0f;
+    const int legend_y = (int)bounds.y + 14;
+    const int legend_x = (int)(bounds.x + bounds.width - 177.0f);
+    DrawLineEx((Vector2){(float)legend_x, (float)legend_y + 7.0f},
+               (Vector2){(float)legend_x + 14.0f, (float)legend_y + 7.0f},
+               2.5f, COLOR_GREEN);
+    draw_text("Carga +", legend_x + 19, legend_y, 11, COLOR_TEXT);
+    DrawLineEx((Vector2){(float)legend_x + 91.0f, (float)legend_y + 7.0f},
+               (Vector2){(float)legend_x + 105.0f, (float)legend_y + 7.0f},
+               2.5f, COLOR_CYAN);
+    draw_text("Descarga -", legend_x + 110, legend_y, 11, COLOR_TEXT);
+
+    float required_scale = 0.0f;
     for (size_t i = 0; i < history->count; ++i)
     {
         float power;
@@ -453,22 +613,50 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
         {
             continue;
         }
-        if (power < 0.0f && -power > max_abs)
-            max_abs = -power;
-        if (power > max_abs)
-            max_abs = power;
+        if (fabsf(power) > required_scale)
+            required_scale = fabsf(power);
     }
-    max_abs *= 1.15f;
+    const float max_abs = chart_scale_for_power(required_scale * 1.1f);
 
-    const float zero_y = plot.y + plot.height / 2.0f;
+    const float half_height = plot.height / 2.0f;
+    const float zero_y = plot.y + half_height;
     DrawLineEx((Vector2){plot.x, plot.y}, (Vector2){plot.x, plot.y + plot.height},
-               1.0f, COLOR_BORDER);
-    DrawLineEx((Vector2){plot.x, zero_y}, (Vector2){plot.x + plot.width, zero_y},
                1.0f, COLOR_BORDER);
     DrawLineEx((Vector2){plot.x, plot.y + plot.height},
                (Vector2){plot.x + plot.width, plot.y + plot.height},
                1.0f, COLOR_BORDER);
-    draw_text("W", (int)bounds.x + 31, (int)plot.y + 2, 12, COLOR_MUTED);
+
+    for (int tick = 0; tick <= 4; ++tick)
+    {
+        const float fraction = (float)tick / 4.0f;
+        const float y = plot.y + fraction * plot.height;
+        const float value = max_abs * (1.0f - 2.0f * fraction);
+        const Color grid_color = tick == 2 ? COLOR_MUTED : COLOR_BORDER;
+        DrawLineEx((Vector2){plot.x, y},
+                   (Vector2){plot.x + plot.width, y},
+                   tick == 2 ? 1.5f : 1.0f, grid_color);
+        char label[24];
+        format_chart_power(value, label, sizeof(label));
+        const int label_width = (int)measure_text_width(label, 10);
+        draw_text(label, (int)plot.x - label_width - 8,
+                  (int)y - 5, 10, COLOR_MUTED);
+    }
+
+    for (int tick = 0; tick <= 2; ++tick)
+    {
+        const float x = plot.x + (float)tick * plot.width / 2.0f;
+        if (tick == 1)
+        {
+            DrawLineEx((Vector2){x, plot.y},
+                       (Vector2){x, plot.y + plot.height},
+                       1.0f, COLOR_BORDER);
+        }
+        const size_t sample_index =
+            (history->count - 1) * (size_t)tick / 2u;
+        draw_time_label(history->samples[sample_index].timestamp,
+                        (int)x, (int)(plot.y + plot.height + 5.0f),
+                        COLOR_MUTED, tick == 1, tick == 2);
+    }
 
     for (size_t i = 1; i < history->count; ++i)
     {
@@ -484,8 +672,12 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
             zero_y - previous_power * (plot.height / 2.0f) / max_abs};
         const Vector2 current = {
             plot.x + (float)i * plot.width / (float)(history->count - 1),
-            zero_y - current_power * (plot.height / 2.0f) / max_abs};
-        DrawLineEx(previous, current, 2.5f, COLOR_CYAN);
+            zero_y - current_power * half_height / max_abs};
+        const float midpoint = (previous_power + current_power) / 2.0f;
+        const Color line_color = midpoint > 0.0f ? COLOR_GREEN
+                                 : midpoint < 0.0f ? COLOR_CYAN
+                                                   : COLOR_MUTED;
+        DrawLineEx(previous, current, 2.5f, line_color);
     }
 }
 
@@ -554,8 +746,8 @@ static void draw_sidebar(int screen_height, Texture2D logo, bool logo_loaded)
 
     const float footer_y = (float)screen_height - 100.0f;
     DrawLine(24, (int)footer_y, 196, (int)footer_y, COLOR_BORDER);
-    DrawCircle(34, (int)footer_y + 28, 4.0f, COLOR_GREEN);
-    draw_text("Fuente activa", 50, (int)footer_y + 19, 12, COLOR_MUTED);
+    DrawCircle(34, (int)footer_y + 28, 4.0f, COLOR_CYAN);
+    draw_text("Origen de datos", 50, (int)footer_y + 19, 12, COLOR_MUTED);
     draw_text("Simulador local", 50, (int)footer_y + 39, 13, COLOR_TEXT);
 }
 
@@ -652,7 +844,7 @@ static uint8_t draw_header(int screen_width, int content_x, uint8_t pack_id,
                            bool status_error, bool *export_clicked)
 {
     draw_text_bold("Resumen del sistema", content_x, 20, 26, COLOR_TEXT);
-    draw_text("Monitor de bateria  /  Modo demostracion - sin conexion al BMS",
+    draw_text("Monitor de bateria LiFePO4",
               content_x, 53, 13, COLOR_MUTED);
 
     const float control_y = 28.0f;
@@ -675,8 +867,14 @@ static uint8_t draw_header(int screen_width, int content_x, uint8_t pack_id,
                     control_y, export_w, button_h},
         "Exportar CSV", false, COLOR_CYAN);
 
+    const Rectangle demo_badge = {(float)content_x, 78.0f, 304.0f, 20.0f};
+    DrawRectangleRec(demo_badge, (Color){255, 246, 229, 255});
+    DrawRectangleLinesEx(demo_badge, 1.0f, (Color){239, 218, 180, 255});
+    draw_text_bold("DEMO  /  SIMULADOR  /  BMS NO CONECTADO",
+                   content_x + 9, 82, 10, COLOR_AMBER);
     const Color status_color = status_error ? COLOR_RED : COLOR_MUTED;
-    draw_text(status, content_x, 79, 12, status_color);
+    draw_text_fit(status, content_x, 102, 11, status_color,
+                  (float)screen_width - (float)content_x - 28.0f);
     if (select_100 && pack_id != 1)
         return 1;
     if (select_335 && pack_id != 2)
@@ -694,7 +892,7 @@ int main(void)
     history_t *history = &histories[0];
     uint8_t selected_pack = 1;
     double sample_timer = 0.0;
-    char status[160] = "Muestras simuladas cada segundo. No hay conexion con el BMS.";
+    char status[160] = "Simulacion activa; muestra cada segundo.";
     bool status_error = false;
 
     if (!battery_simulator_init(&simulator, selected_pack,
@@ -763,7 +961,7 @@ int main(void)
                 else
                 {
                     snprintf(status, sizeof(status),
-                             "Muestras simuladas cada segundo. No hay conexion con el BMS.");
+                             "Simulacion activa; muestra cada segundo.");
                     status_error = false;
                 }
             }
@@ -775,7 +973,7 @@ int main(void)
         const float margin = sidebar_width + 28.0f;
         const float gap = 14.0f;
         const float content_width = (float)screen_width - margin - 28.0f;
-        const float top_y = 116.0f;
+        const float top_y = 128.0f;
         const float top_h = 128.0f;
         const float top_w = (content_width - 2.0f * gap) / 3.0f;
         const float metrics_y = top_y + top_h + 12.0f;
@@ -823,11 +1021,17 @@ int main(void)
         }
         if (calculations.power_available)
         {
-            const double signed_current_A =
-                (double)latest_data.current_mA / 1000.0;
-            const double signed_power_W =
-                (double)latest_data.voltage_mV / 1000.0 * signed_current_A;
-            snprintf(power, sizeof(power), "%+.0f W", signed_power_W);
+            if (latest_data.current_mA == 0)
+            {
+                snprintf(power, sizeof(power), "0 W");
+            }
+            else
+            {
+                const double signed_power_W =
+                    latest_data.current_mA < 0 ? -calculations.power_W
+                                               : calculations.power_W;
+                snprintf(power, sizeof(power), "%+.0f W", signed_power_W);
+            }
         }
         else
         {
@@ -857,14 +1061,23 @@ int main(void)
                          !battery_has_field(&latest_data, BATTERY_FIELD_CURRENT)
                              ? "Desconocida"
                              : "Media del intervalo",
-                         latest_data.current_mA > 0 ? COLOR_GREEN : COLOR_CYAN);
+                         !battery_has_field(&latest_data, BATTERY_FIELD_CURRENT)
+                             ? COLOR_MUTED
+                             : latest_data.current_mA > 0
+                                   ? COLOR_GREEN
+                                   : latest_data.current_mA < 0
+                                         ? COLOR_CYAN
+                                         : COLOR_TEXT);
         draw_metric_card((Rectangle){margin + 2.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
                          "POTENCIA ESTIMADA", power,
-                         "V x corriente media", COLOR_AMBER);
+                         "V x |I|; signo segun corriente",
+                         latest_data.current_mA > 0 ? COLOR_GREEN
+                         : latest_data.current_mA < 0 ? COLOR_CYAN
+                                                      : COLOR_TEXT);
         draw_metric_card((Rectangle){margin + 3.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
-                         "CICLOS", cycles, "Dato de ejemplo", COLOR_TEXT);
+                         "CICLOS", cycles, "Dato simulado", COLOR_TEXT);
 
         draw_cells_panel((Rectangle){margin, panels_y, cells_w, panels_h},
                          &latest_data);
