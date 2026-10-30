@@ -337,7 +337,7 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
     draw_text(delta, (int)(bounds.x + bounds.width - (float)delta_width - 18.0f),
               (int)bounds.y + 16, 12, COLOR_MUTED);
 
-    const int columns = data->cell_count > 16 ? 8
+    const int columns = data->cell_count > 16  ? 8
                         : data->cell_count > 4 ? 4
                                                : data->cell_count;
     const float gap = 6.0f;
@@ -524,7 +524,7 @@ static float chart_scale_for_power(float required)
     const float exponent = floorf(log10f(required));
     const float base = powf(10.0f, exponent);
     const float normalized = required / base;
-    const float multiplier = normalized <= 1.0f ? 1.0f
+    const float multiplier = normalized <= 1.0f   ? 1.0f
                              : normalized <= 2.0f ? 2.0f
                              : normalized <= 5.0f ? 5.0f
                                                   : 10.0f;
@@ -571,8 +571,9 @@ static void draw_time_label(time_t timestamp, int x, int y, Color color,
         return;
     }
     const int label_width = (int)measure_text_width(label, 10);
-    const int label_x = center ? x - label_width / 2
-                               : align_right ? x - label_width : x;
+    const int label_x = center        ? x - label_width / 2
+                        : align_right ? x - label_width
+                                      : x;
     draw_text(label, label_x, y, 10, color);
 }
 
@@ -674,7 +675,7 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
             plot.x + (float)i * plot.width / (float)(history->count - 1),
             zero_y - current_power * half_height / max_abs};
         const float midpoint = (previous_power + current_power) / 2.0f;
-        const Color line_color = midpoint > 0.0f ? COLOR_GREEN
+        const Color line_color = midpoint > 0.0f   ? COLOR_GREEN
                                  : midpoint < 0.0f ? COLOR_CYAN
                                                    : COLOR_MUTED;
         DrawLineEx(previous, current, 2.5f, line_color);
@@ -1063,16 +1064,16 @@ int main(void)
                              : "Media del intervalo",
                          !battery_has_field(&latest_data, BATTERY_FIELD_CURRENT)
                              ? COLOR_MUTED
-                             : latest_data.current_mA > 0
-                                   ? COLOR_GREEN
-                                   : latest_data.current_mA < 0
-                                         ? COLOR_CYAN
-                                         : COLOR_TEXT);
+                         : latest_data.current_mA > 0
+                             ? COLOR_GREEN
+                         : latest_data.current_mA < 0
+                             ? COLOR_CYAN
+                             : COLOR_TEXT);
         draw_metric_card((Rectangle){margin + 2.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
                          "POTENCIA ESTIMADA", power,
                          "V x |I|; signo segun corriente",
-                         latest_data.current_mA > 0 ? COLOR_GREEN
+                         latest_data.current_mA > 0   ? COLOR_GREEN
                          : latest_data.current_mA < 0 ? COLOR_CYAN
                                                       : COLOR_TEXT);
         draw_metric_card((Rectangle){margin + 3.0f * (metric_w + gap), metrics_y,
