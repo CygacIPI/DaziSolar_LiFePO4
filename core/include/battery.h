@@ -10,14 +10,16 @@
 #define BATTERY_MIN_PACK_ID 1
 #define BATTERY_MAX_PACK_ID 15
 
-typedef enum {
+typedef enum
+{
     BATTERY_SOURCE_SIMULATOR = 0,
     BATTERY_SOURCE_TCP,
     BATTERY_SOURCE_SERIAL,
     BATTERY_SOURCE_CAN
 } battery_source_t;
 
-typedef struct {
+typedef struct
+{
     uint8_t pack_id;
     uint32_t voltage_mV;
     int32_t current_mA;
@@ -33,7 +35,8 @@ typedef struct {
     uint8_t source;
 } battery_data_t;
 
-typedef enum {
+typedef enum
+{
     BATTERY_ALARM_NONE = 0,
     BATTERY_ALARM_VOLTAGE_LOW = 1u << 0,
     BATTERY_ALARM_VOLTAGE_HIGH = 1u << 1,
@@ -44,7 +47,8 @@ typedef enum {
     BATTERY_ALARM_DISCHARGE_CURRENT_HIGH = 1u << 6
 } battery_alarm_t;
 
-typedef struct {
+typedef struct
+{
     double stored_energy_Wh;
     double nominal_energy_Wh;
     double usable_nominal_energy_Wh;
@@ -53,18 +57,21 @@ typedef struct {
     bool runtime_available;
 } battery_calculations_t;
 
-typedef struct {
+typedef struct
+{
     uint8_t pack_id;
     uint32_t nominal_mAh;
     uint32_t tick;
 } battery_simulator_t;
 
-typedef struct {
+typedef struct
+{
     uint32_t nominal_mAh;
     double soc_pct;
 } battery_coulomb_counter_t;
 
-typedef enum {
+typedef enum
+{
     BATTERY_DATA_VALID = 0,
     BATTERY_DATA_INVALID_NULL,
     BATTERY_DATA_INVALID_PACK_ID,

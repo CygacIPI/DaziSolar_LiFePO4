@@ -6,12 +6,14 @@
 
 static int failures;
 
-#define CHECK(condition)                                                        \
-    do {                                                                        \
-        if (!(condition)) {                                                     \
+#define CHECK(condition)                                                          \
+    do                                                                            \
+    {                                                                             \
+        if (!(condition))                                                         \
+        {                                                                         \
             fprintf(stderr, "FALLO %s:%d: %s\n", __FILE__, __LINE__, #condition); \
-            failures++;                                                         \
-        }                                                                       \
+            failures++;                                                           \
+        }                                                                         \
     } while (0)
 
 static int nearly_equal(double left, double right, double tolerance)
@@ -37,7 +39,8 @@ static battery_data_t reference_battery(void)
     data.remaining_mAh = 68870;
     data.nominal_mAh = 100000;
     data.cell_count = 16;
-    for (uint8_t i = 0; i < data.cell_count; ++i) {
+    for (uint8_t i = 0; i < data.cell_count; ++i)
+    {
         data.cell_mV[i] = (i < 11) ? 3332 : 3333;
     }
     data.temp_count = 1;
@@ -156,7 +159,8 @@ static void test_simulator(void)
     CHECK(data.source == BATTERY_SOURCE_SIMULATOR);
     CHECK(data.remaining_mAh == 68870);
     CHECK(data.alarms == BATTERY_ALARM_NONE);
-    for (uint8_t i = 0; i < data.cell_count; ++i) {
+    for (uint8_t i = 0; i < data.cell_count; ++i)
+    {
         cell_voltage_sum += data.cell_mV[i];
     }
     CHECK(cell_voltage_sum == data.voltage_mV);
@@ -196,7 +200,8 @@ int main(void)
     test_simulator();
     test_coulomb_counter();
 
-    if (failures > 0) {
+    if (failures > 0)
+    {
         fprintf(stderr, "%d prueba(s) fallaron.\n", failures);
         return 1;
     }

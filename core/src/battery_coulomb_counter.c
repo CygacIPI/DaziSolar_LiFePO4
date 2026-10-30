@@ -4,7 +4,8 @@ bool battery_coulomb_counter_init(battery_coulomb_counter_t *counter,
                                   uint32_t nominal_mAh,
                                   uint8_t initial_soc_pct)
 {
-    if (counter == NULL || nominal_mAh == 0 || initial_soc_pct > 100) {
+    if (counter == NULL || nominal_mAh == 0 || initial_soc_pct > 100)
+    {
         return false;
     }
 
@@ -22,7 +23,8 @@ bool battery_coulomb_counter_update(battery_coulomb_counter_t *counter,
         estimated_soc_pct == NULL ||
         counter->nominal_mAh == 0 ||
         counter->soc_pct < 0.0 ||
-        counter->soc_pct > 100.0) {
+        counter->soc_pct > 100.0)
+    {
         return false;
     }
 
@@ -30,9 +32,12 @@ bool battery_coulomb_counter_update(battery_coulomb_counter_t *counter,
         ((double)current_mA * (double)elapsed_seconds) / 3600.0;
     counter->soc_pct += delta_mAh * 100.0 / (double)counter->nominal_mAh;
 
-    if (counter->soc_pct < 0.0) {
+    if (counter->soc_pct < 0.0)
+    {
         counter->soc_pct = 0.0;
-    } else if (counter->soc_pct > 100.0) {
+    }
+    else if (counter->soc_pct > 100.0)
+    {
         counter->soc_pct = 100.0;
     }
 

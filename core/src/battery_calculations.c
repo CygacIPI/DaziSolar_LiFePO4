@@ -8,7 +8,8 @@ bool battery_calculate(const battery_data_t *data,
 {
     if (!battery_data_is_valid(data) ||
         calculations == NULL ||
-        depth_of_discharge_pct > 100) {
+        depth_of_discharge_pct > 100)
+    {
         return false;
     }
 
@@ -24,7 +25,7 @@ bool battery_calculate(const battery_data_t *data,
         ((double)depth_of_discharge_pct / 100.0);
     calculations->power_W = voltage_V * fabs(current_A);
     calculations->runtime_available = data->current_mA < 0 &&
-                                       calculations->power_W > 0.0;
+                                      calculations->power_W > 0.0;
     calculations->runtime_h = calculations->runtime_available
                                   ? calculations->stored_energy_Wh / calculations->power_W
                                   : 0.0;
