@@ -1,65 +1,124 @@
 #include "battery.h"
 
-#define MILLIVOLTS_PER_VOLT 1000
-#define DECICELSIUS_PER_CELSIUS 10
-#define MILLIAMPS_PER_AMP 1000
-
-bool battery_evaluate_alarms(const battery_data_t *data, uint32_t *result)
+static bool alarm_config_is_valid(const battery_alarm_config_t *config)
 {
-    if (!battery_data_is_valid(data) || result == NULL)
+    return config != NULL &&
+           config->minimum_voltage_mV < config->maximum_voltage_mV &&
+           config->maximum_voltage_mV <= config->maximum_charge_voltage_mV &&
+           config->minimum_charge_temperature_dC <=
+               config->maximum_charge_temperature_dC &&
+           config->minimum_discharge_temperature_dC <=
+               config->maximum_discharge_temperature_dC;
+}
+
+bool battery_alarm_config_for_capacity(uint32_t nominal_mAh,
+                                       battery_alarm_config_t *config)
+{
+    if (config == NULL)
+    {
+        return false;
+    }
+
+    *config = (battery_alarm_config_t){
+        .nominal_mAh = nominal_mAh,
+        .minimum_voltage_mV = 43200,
+        .maximum_voltage_mV = 57600,
+        .maximum_charge_voltage_mV = 58400,
+        .minimum_charge_temperature_dC = 0,
+        .maximum_charge_temperature_dC = 450,
+        .minimum_discharge_temperature_dC = -200,
+        .maximum_discharge_temperature_dC = 600,
+        .maximum_charge_current_mA = 0,
+        .maximum_discharge_current_mA = 0,
+        .thresholds_are_provisional = true};
+
+    if (nominal_mAh == 100000)
+    {
+        config->maximum_charge_current_mA = 100000;
+        config->maximum_discharge_current_mA = 100000;
+    }
+    else if (nominal_mAh == 335000)
+    {
+        config->maximum_charge_current_mA = 200000;
+        config->maximum_discharge_current_mA = 200000;
+    }
+
+    return true;
+}
+
+bool battery_evaluate_alarms_with_config(const battery_data_t *data,
+                                         const battery_alarm_config_t *config,
+                                         uint32_t *result)
+{
+    if (result != NULL)
+    {
+        *result = BATTERY_ALARM_NONE;
+    }
+    if (!battery_data_is_valid(data) ||
+        !alarm_config_is_valid(config) ||
+        result == NULL ||
+        (battery_has_field(data, BATTERY_FIELD_NOMINAL_CAPACITY) &&
+         config->nominal_mAh != 0 &&
+         config->nominal_mAh != data->nominal_mAh))
     {
         return false;
     }
 
     uint32_t alarms = BATTERY_ALARM_NONE;
-    const int64_t current_mA = data->current_mA;
-    const bool charging = current_mA > 0;
-
-    if (data->voltage_mV < 43200)
+    if (battery_has_field(data, BATTERY_FIELD_VOLTAGE))
     {
-        alarms |= BATTERY_ALARM_VOLTAGE_LOW;
-    }
-    if (data->voltage_mV > 57600)
-    {
-        alarms |= BATTERY_ALARM_VOLTAGE_HIGH;
-    }
-    if (charging && data->voltage_mV > 58400)
-    {
-        alarms |= BATTERY_ALARM_CHARGE_VOLTAGE_HIGH;
-    }
-
-    for (uint8_t i = 0; i < data->temp_count; ++i)
-    {
-        if (charging)
+        if (data->voltage_mV < config->minimum_voltage_mV)
         {
-            if (data->temp_dC[i] < 0 || data->temp_dC[i] > 450)
+            alarms |= BATTERY_ALARM_VOLTAGE_LOW;
+        }
+        if (data->voltage_mV > config->maximum_voltage_mV)
+        {
+            alarms |= BATTERY_ALARM_VOLTAGE_HIGH;
+        }
+        if (battery_has_field(data, BATTERY_FIELD_CURRENT) &&
+            data->current_mA > 0 &&
+            data->voltage_mV > config->maximum_charge_voltage_mV)
+        {
+            alarms |= BATTERY_ALARM_CHARGE_VOLTAGE_HIGH;
+        }
+    }
+
+    if (battery_has_field(data, BATTERY_FIELD_TEMPERATURES) &&
+        battery_has_field(data, BATTERY_FIELD_CURRENT))
+    {
+        const bool charging = data->current_mA > 0;
+        for (uint8_t i = 0; i < data->temp_count; ++i)
+        {
+            if (charging)
             {
-                alarms |= BATTERY_ALARM_CHARGE_TEMPERATURE;
+                if (data->temp_dC[i] < config->minimum_charge_temperature_dC ||
+                    data->temp_dC[i] > config->maximum_charge_temperature_dC)
+                {
+                    alarms |= BATTERY_ALARM_CHARGE_TEMPERATURE;
+                }
+            }
+            else if (data->temp_dC[i] <
+                         config->minimum_discharge_temperature_dC ||
+                     data->temp_dC[i] >
+                         config->maximum_discharge_temperature_dC)
+            {
+                alarms |= BATTERY_ALARM_DISCHARGE_TEMPERATURE;
             }
         }
-        else if (data->temp_dC[i] < -200 || data->temp_dC[i] > 600)
-        {
-            alarms |= BATTERY_ALARM_DISCHARGE_TEMPERATURE;
-        }
     }
 
-    uint32_t continuous_current_limit_mA = 0;
-    if (data->nominal_mAh == 100000)
+    if (battery_has_field(data, BATTERY_FIELD_CURRENT))
     {
-        continuous_current_limit_mA = 100 * MILLIAMPS_PER_AMP;
-    }
-    else if (data->nominal_mAh == 335000)
-    {
-        continuous_current_limit_mA = 200 * MILLIAMPS_PER_AMP;
-    }
-
-    if (continuous_current_limit_mA > 0)
-    {
-        if (charging && current_mA > continuous_current_limit_mA)
+        const int64_t current_mA = data->current_mA;
+        if (current_mA > 0 &&
+            config->maximum_charge_current_mA > 0 &&
+            current_mA > (int64_t)config->maximum_charge_current_mA)
         {
             alarms |= BATTERY_ALARM_CHARGE_CURRENT_HIGH;
         }
-        else if (!charging && -current_mA > continuous_current_limit_mA)
+        else if (current_mA < 0 &&
+                 config->maximum_discharge_current_mA > 0 &&
+                 -current_mA > (int64_t)config->maximum_discharge_current_mA)
         {
             alarms |= BATTERY_ALARM_DISCHARGE_CURRENT_HIGH;
         }
@@ -67,4 +126,24 @@ bool battery_evaluate_alarms(const battery_data_t *data, uint32_t *result)
 
     *result = alarms;
     return true;
+}
+
+bool battery_evaluate_alarms(const battery_data_t *data, uint32_t *alarms)
+{
+    if (data == NULL)
+    {
+        if (alarms != NULL)
+        {
+            *alarms = BATTERY_ALARM_NONE;
+        }
+        return false;
+    }
+
+    battery_alarm_config_t config;
+    const uint32_t nominal_mAh =
+        battery_has_field(data, BATTERY_FIELD_NOMINAL_CAPACITY)
+            ? data->nominal_mAh
+            : 0;
+    return battery_alarm_config_for_capacity(nominal_mAh, &config) &&
+           battery_evaluate_alarms_with_config(data, &config, alarms);
 }

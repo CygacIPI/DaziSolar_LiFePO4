@@ -11,16 +11,39 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 option(BUILD_DESKTOP "Build the raylib desktop application" ON)
+option(APP_ENABLE_STRICT_WARNINGS "Treat strict compiler warnings as errors" ON)
 
 add_library(lifepo4-core STATIC
     core/src/battery.c
     core/src/battery_calculations.c
     core/src/battery_alarms.c
     core/src/battery_coulomb_counter.c
+    core/src/battery_csv.c
     core/src/battery_simulator.c
 )
 
 target_include_directories(lifepo4-core PUBLIC core/include)
+
+function(apply_project_warnings target)
+    if(APP_ENABLE_STRICT_WARNINGS)
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /W4)
+        elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(${target} PRIVATE
+                -Wall
+                -Wextra
+                -Wpedantic
+                -Wconversion
+                -Wshadow
+                -Wstrict-prototypes
+                -Wformat=2
+                -Werror
+            )
+        endif()
+    endif()
+endfunction()
+
+apply_project_warnings(lifepo4-core)
 
 if(BUILD_DESKTOP)
     find_package(raylib CONFIG REQUIRED)
@@ -30,6 +53,7 @@ if(BUILD_DESKTOP)
     )
 
     target_link_libraries(lifepo4-desktop PRIVATE lifepo4-core raylib)
+    apply_project_warnings(lifepo4-desktop)
 
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/assets")
     configure_file(
@@ -46,5 +70,6 @@ if(BUILD_TESTING)
         core/tests/test_core.c
     )
     target_link_libraries(core-tests PRIVATE lifepo4-core)
+    apply_project_warnings(core-tests)
     add_test(NAME core-tests COMMAND core-tests)
 endif()

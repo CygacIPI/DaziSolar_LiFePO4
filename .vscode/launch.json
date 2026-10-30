@@ -2,14 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "C/C++ Runner: Debug Session",
+      "name": "App LiFePO4 (CMake)",
       "type": "cppdbg",
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/DELL/Documents/DaziSolar_LiFePO4",
-      "program": "c:/Users/DELL/Documents/DaziSolar_LiFePO4/build/Debug/outDebug",
+      "cwd": "${workspaceFolder}",
+      "program": "${command:cmake.launchTargetPath}",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

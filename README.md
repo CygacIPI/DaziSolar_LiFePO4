@@ -62,11 +62,13 @@ Si cambias de generador o de compilador, elimina solo la carpeta generada `build
 ## Sprint 1: nucleo y simulador
 
 - `core/` contiene el modelo de datos, validacion, calculos de energia/potencia/autonomia, alarmas y un simulador determinista.
-- `core-tests` verifica el ejemplo energetico, limites de entrada, umbrales de alarma, conteo de Coulomb y ambas capacidades de pack indicadas.
+- `battery_data_t.valid_fields` distingue un cero medido de un dato desconocido/no disponible; los calculos solo publican magnitudes cuando disponen de sus entradas.
+- `core-tests` verifica validacion, datos parciales, calculos, umbrales y limites de alarma, conteo de Coulomb, 10.000 pasos de simulacion y exportacion CSV.
 - Los datos del simulador son ilustrativos; no son lecturas de una bateria.
-- La energia almacenada se calcula como tension medida en voltios por capacidad restante en Ah. La energia nominal usa 51.2 V por capacidad nominal; la energia util nominal aplica el DoD solicitado como porcentaje.
-- La autonomia solo se informa cuando la corriente indica descarga (corriente negativa); se estima dividiendo energia almacenada por potencia `V * |I|`. No es una prediccion garantizada de uso real.
+- La energia almacenada se calcula como tension medida (V) por capacidad restante (Ah). La energia nominal usa 51.2 V por capacidad nominal; la energia util nominal aplica el DoD solicitado como porcentaje. Wh se convierte a kWh dividiendo por 1.000.
+- La corriente positiva significa carga y la negativa descarga. La autonomia solo se informa durante descarga; divide energia almacenada por potencia `V * |I|`. No es una prediccion garantizada de uso real.
 - Si en el futuro el BMS no entrega capacidad restante, el nucleo ofrece un contador de Coulomb que integra corriente con el tiempo a partir de un SOC inicial. Su precision depende de la calibracion y deriva de corriente/SOC; no sustituye una lectura confirmada del BMS. No se incluye estimacion por tension porque no hay una curva de reposo verificada para este pack.
+- Los limites de alarma estan centralizados por capacidad (100 Ah/335 Ah), pero los valores existentes y su uso como alarmas de monitorizacion son provisionales. No representan limites de seguridad certificados; las protecciones del BMS son independientes y deben permanecer activas.
 
 ## Sprint 2: interfaz simulada
 
@@ -74,7 +76,7 @@ Si cambias de generador o de compilador, elimina solo la carpeta generada `build
 - El estilo es un panel administrativo minimalista: navegacion lateral, fondo claro, tarjetas limpias y acentos verdes/azules inspirados en la identidad visual de Dazi Solar y el manual del equipo. El logo PNG facilitado para el proyecto se guarda sin modificar en `assets/dazi-solar-logo.png`; CMake lo copia a `build/assets/` junto al ejecutable. Si no se encuentra al iniciar, la aplicacion informa el problema y muestra una marca textual alternativa.
 - La interfaz usa Segoe UI del sistema Windows (con Arial como alternativa) mediante fuentes TrueType antialias de raylib, no la fuente bitmap predeterminada. No se distribuyen archivos de fuente. Si ninguna de esas fuentes esta instalada, se muestra un aviso en la consola y se conserva la fuente integrada como fallback.
 - Se puede alternar entre los perfiles simulados de 100 Ah y 335 Ah. El grafico representa potencia con signo: positiva durante carga y negativa durante descarga.
-- Las muestras se actualizan cada segundo y el grafico conserva hasta 60 muestras. **Exportar CSV** guarda ese historial en `historial_simulado.csv` en la carpeta de trabajo actual; cada exportacion reemplaza el archivo anterior.
+- El simulador recibe el tiempo transcurrido real entre actualizaciones; conserva historiales independientes de hasta 60 muestras para cada perfil (100 Ah y 335 Ah). **Exportar CSV** crea `historial_simulado_<fecha-UTC>_<secuencia>.csv` para el perfil seleccionado, en la carpeta de trabajo actual y con creacion exclusiva para no sobrescribir exportaciones anteriores. Los campos desconocidos se exportan vacios; los encabezados explicitan unidades y la columna `valid_fields` documenta disponibilidad. Si la escritura falla, la interfaz informa el error.
 - Esta pantalla es exclusivamente de simulacion. No existe conexion TCP, serie o CAN con la bateria; la informacion de celdas, temperatura y ciclos tambien es ficticia.
 
 Para recompilar y verificar en MSYS2 UCRT64:
@@ -97,6 +99,8 @@ ctest --test-dir build --output-on-failure
   ctest --test-dir build-core --output-on-failure
   ```
 
+- CMake aplica advertencias estrictas por defecto (`APP_ENABLE_STRICT_WARNINGS=ON`): GCC/Clang trata las advertencias como errores y MSVC usa nivel `/W4`. La integracion continua comprueba las configuraciones GCC/MinGW UCRT64 con interfaz y en modo nucleo-only; MSVC no forma parte de esa CI.
+- La exportacion CSV es un modulo portable del nucleo (`battery_csv`); no depende de la interfaz raylib.
 - `docs/protocol-status.md` registra interfaces, evidencia necesaria y bloqueos. `docs/validation-plan.md` separa integridad software de medicion electrica e incluye una plantilla para resultados.
 - Las fotos del manual confirman pines RJ45 para CAN, RS485-1 y RS485-2, y 9600 bps por defecto para RS485-2; no muestran el protocolo de aplicacion/mapa de datos necesario para implementar un parser.
 - **No se implemento un driver real:** no se dispone aun de protocolo confirmado, mapa de registros/tramas ni adaptador verificado. Modbus TCP por Wi-Fi sigue siendo solo una sospecha, no un dato confirmado. No se realizan conexiones ni se transmiten bytes al BMS.

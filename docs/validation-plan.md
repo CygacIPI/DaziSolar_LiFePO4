@@ -6,7 +6,7 @@ La compilacion y las pruebas unitarias comprueban comportamiento del software; n
 
 ## Estado de preparacion
 
-- **Integridad de datos:** validaciones y pruebas unitarias en desarrollo; todavia no hay parser de BMS.
+- **Integridad de datos del nucleo:** validaciones y pruebas unitarias automatizadas para entradas, campos desconocidos, calculos, alarmas, contador de Coulomb, secuencias del simulador y CSV. No hay parser de BMS.
 - **Validacion electrica:** pendiente de definir tolerancias aprobadas y obtener lecturas reales comparables.
 - **Hardware:** pendiente confirmar adaptadores, aislamiento, documentacion y supervision.
 - **Resultado actual:** solo simulacion. No se han medido ni certificado valores de una bateria.
@@ -18,6 +18,8 @@ Antes de conectar equipo real:
 - Rechazar registros nulos, pack ID fuera de 1..15, SOC fuera de 0..100, conteos fuera de los arrays y fuentes desconocidas.
 - Si FULL_CAP/nominal capacity esta presente, rechazar capacidad restante superior a la nominal. Si la capacidad nominal no esta disponible, permitir que quede marcada como desconocida.
 - Rechazar tensiones de celda cero cuando el registro declara esa celda presente.
+- Mantener separados los datos estructuralmente invalidos y las mediciones fuera de los umbrales de operacion: una tension o temperatura fuera de rango puede ser una lectura valida que debe activar una alarma, no descartarse como desconocida. Los rangos de alarma actuales son provisionales y no constituyen una validacion del sensor.
+- No imponer un rango fisico universal adicional a las temperaturas hasta conocer las especificaciones del sensor BMS; validar por ahora presencia/conteo, rango representable y umbrales configurados.
 - Validar tamanos de trama, version, direccion, checksum/CRC y unidades unicamente segun el protocolo oficial.
 - Probar limites, campos truncados, datos invalidos, checksum incorrecto, campos opcionales ausentes y secuencias de reconexion mediante fixtures.
 - Conservar errores explicitos. No convertir tramas invalidas en muestras con aspecto de exito.

@@ -1,7 +1,9 @@
 #include "battery.h"
+#include "battery_csv.h"
 #include "raylib.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -133,7 +135,7 @@ static bool button(Rectangle bounds, const char *label, bool selected, Color acc
     DrawRectangleRec(bounds, fill);
     DrawRectangleLinesEx(bounds, 1.0f, selected ? accent : COLOR_BORDER);
     const int label_width = (int)measure_text_width(label, 15);
-    draw_text(label, (int)(bounds.x + (bounds.width - label_width) / 2),
+    draw_text(label, (int)(bounds.x + (bounds.width - (float)label_width) / 2.0f),
               (int)(bounds.y + (bounds.height - 15) / 2), 15, text);
     return pressed;
 }
@@ -156,11 +158,26 @@ static void draw_energy_card(Rectangle bounds,
 {
     char energy[32];
     char detail[96];
-    snprintf(energy, sizeof(energy), "%.2f kWh",
-             calculations->stored_energy_Wh / 1000.0);
-    snprintf(detail, sizeof(detail), "Nominal %.2f kWh  |  util (DoD %d%%) %.2f kWh",
-             calculations->nominal_energy_Wh / 1000.0, DO_D_PCT,
-             calculations->usable_nominal_energy_Wh / 1000.0);
+    if (calculations->stored_energy_available)
+    {
+        snprintf(energy, sizeof(energy), "%.2f kWh",
+                 calculations->stored_energy_Wh / 1000.0);
+    }
+    else
+    {
+        snprintf(energy, sizeof(energy), "No disponible");
+    }
+    if (calculations->nominal_energy_available)
+    {
+        snprintf(detail, sizeof(detail),
+                 "Nominal %.2f kWh | util (DoD %d%%) %.2f kWh",
+                 calculations->nominal_energy_Wh / 1000.0, DO_D_PCT,
+                 calculations->usable_nominal_energy_Wh / 1000.0);
+    }
+    else
+    {
+        snprintf(detail, sizeof(detail), "Capacidad nominal desconocida");
+    }
 
     draw_panel(bounds);
     draw_text("ENERGIA ALMACENADA", (int)bounds.x + 18, (int)bounds.y + 14,
@@ -173,10 +190,28 @@ static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
 {
     char percent[16];
     char capacity[64];
-    snprintf(percent, sizeof(percent), "%u%%", data->soc_pct);
-    snprintf(capacity, sizeof(capacity), "%.2f Ah restantes de %.0f Ah",
-             (double)data->remaining_mAh / 1000.0,
-             (double)data->nominal_mAh / 1000.0);
+    const bool has_soc = battery_has_field(data, BATTERY_FIELD_SOC);
+    const bool has_remaining =
+        battery_has_field(data, BATTERY_FIELD_REMAINING_CAPACITY);
+    const bool has_nominal =
+        battery_has_field(data, BATTERY_FIELD_NOMINAL_CAPACITY);
+    snprintf(percent, sizeof(percent), has_soc ? "%u%%" : "--",
+             has_soc ? data->soc_pct : 0u);
+    if (has_remaining && has_nominal)
+    {
+        snprintf(capacity, sizeof(capacity), "%.2f Ah restantes de %.0f Ah",
+                 (double)data->remaining_mAh / 1000.0,
+                 (double)data->nominal_mAh / 1000.0);
+    }
+    else if (has_remaining)
+    {
+        snprintf(capacity, sizeof(capacity), "%.2f Ah restantes",
+                 (double)data->remaining_mAh / 1000.0);
+    }
+    else
+    {
+        snprintf(capacity, sizeof(capacity), "Capacidad restante desconocida");
+    }
 
     draw_panel(bounds);
     draw_text("ESTADO DE CARGA", (int)bounds.x + 18, (int)bounds.y + 14,
@@ -185,7 +220,7 @@ static void draw_soc_card(Rectangle bounds, const battery_data_t *data)
     const Rectangle bar = {bounds.x + 18, bounds.y + 83, bounds.width - 36, 13};
     DrawRectangleRec(bar, COLOR_PANEL_LIGHT);
     Rectangle fill = bar;
-    fill.width *= (float)data->soc_pct / 100.0f;
+    fill.width *= has_soc ? (float)data->soc_pct / 100.0f : 0.0f;
     if (fill.width > 0)
     {
         DrawRectangleRec(fill, COLOR_GREEN);
@@ -223,6 +258,13 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
     draw_text("TENSION POR CELDA", (int)bounds.x + 18, (int)bounds.y + 14,
               14, COLOR_MUTED);
 
+    if (!battery_has_field(data, BATTERY_FIELD_CELLS))
+    {
+        draw_text("Datos de celdas no disponibles", (int)bounds.x + 18,
+                  (int)bounds.y + 64, 15, COLOR_MUTED);
+        return;
+    }
+
     uint16_t minimum = UINT16_MAX;
     uint16_t maximum = 0;
     for (uint8_t i = 0; i < data->cell_count; ++i)
@@ -236,19 +278,13 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
     snprintf(delta, sizeof(delta), "Diferencia max.: %u mV",
              data->cell_count > 0 ? (unsigned)(maximum - minimum) : 0u);
     const int delta_width = (int)measure_text_width(delta, 12);
-    draw_text(delta, (int)(bounds.x + bounds.width - delta_width - 18),
+    draw_text(delta, (int)(bounds.x + bounds.width - (float)delta_width - 18.0f),
               (int)bounds.y + 16, 12, COLOR_CYAN);
-
-    if (data->cell_count == 0)
-    {
-        draw_text("Sin datos de celdas", (int)bounds.x + 18,
-                  (int)bounds.y + 64, 16, COLOR_MUTED);
-        return;
-    }
 
     const int columns = data->cell_count > 8 ? 8 : data->cell_count;
     const float gap = 8.0f;
-    const float cell_width = (bounds.width - 36.0f - gap * (columns - 1)) / columns;
+    const float cell_width =
+        (bounds.width - 36.0f - gap * (float)(columns - 1)) / (float)columns;
     const float cell_height = 52.0f;
     const float start_y = bounds.y + 48.0f;
 
@@ -257,8 +293,8 @@ static void draw_cells_panel(Rectangle bounds, const battery_data_t *data)
         const int row = i / columns;
         const int column = i % columns;
         const Rectangle cell = {
-            bounds.x + 18.0f + column * (cell_width + gap),
-            start_y + row * (cell_height + 9.0f),
+            bounds.x + 18.0f + (float)column * (cell_width + gap),
+            start_y + (float)row * (cell_height + 9.0f),
             cell_width,
             cell_height};
         char value[24];
@@ -303,7 +339,12 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
               (int)bounds.y + 14, 14, COLOR_MUTED);
 
     char temperatures[64];
-    if (data->temp_count == 0)
+    if (!battery_has_field(data, BATTERY_FIELD_TEMPERATURES))
+    {
+        snprintf(temperatures, sizeof(temperatures),
+                 "Temperaturas no disponibles");
+    }
+    else if (data->temp_count == 0)
     {
         snprintf(temperatures, sizeof(temperatures), "Sin datos de temperatura");
     }
@@ -329,6 +370,12 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
     const int alarm_y = (int)bounds.y + 83;
     int alarm_row = 0;
     uint32_t known_alarms = 0;
+    if (!battery_has_field(data, BATTERY_FIELD_ALARMS))
+    {
+        draw_text("Alarmas no disponibles", (int)bounds.x + 18,
+                  alarm_y, 15, COLOR_MUTED);
+        return;
+    }
     for (uint32_t bit = 1; bit <= BATTERY_ALARM_DISCHARGE_CURRENT_HIGH; bit <<= 1)
     {
         if ((data->alarms & bit) == 0)
@@ -346,11 +393,23 @@ static void draw_conditions_panel(Rectangle bounds, const battery_data_t *data)
     }
 }
 
-static float sample_power_W(const history_sample_t *sample)
+static bool sample_power_W(const history_sample_t *sample, float *power_W)
 {
+    if (sample == NULL || power_W == NULL ||
+        !battery_has_field(&sample->data, BATTERY_FIELD_VOLTAGE) ||
+        !battery_has_field(&sample->data, BATTERY_FIELD_CURRENT))
+    {
+        return false;
+    }
     const double voltage_V = (double)sample->data.voltage_mV / 1000.0;
     const double current_A = (double)sample->data.current_mA / 1000.0;
-    return (float)(voltage_V * current_A);
+    const double power = voltage_V * current_A;
+    if (!isfinite(power))
+    {
+        return false;
+    }
+    *power_W = (float)power;
+    return isfinite(*power_W);
 }
 
 static void draw_power_chart(Rectangle bounds, const history_t *history)
@@ -376,7 +435,11 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
     float max_abs = 100.0f;
     for (size_t i = 0; i < history->count; ++i)
     {
-        const float power = sample_power_W(&history->samples[i]);
+        float power;
+        if (!sample_power_W(&history->samples[i], &power))
+        {
+            continue;
+        }
         if (power < 0.0f && -power > max_abs)
             max_abs = -power;
         if (power > max_abs)
@@ -396,8 +459,13 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
 
     for (size_t i = 1; i < history->count; ++i)
     {
-        const float previous_power = sample_power_W(&history->samples[i - 1]);
-        const float current_power = sample_power_W(&history->samples[i]);
+        float previous_power;
+        float current_power;
+        if (!sample_power_W(&history->samples[i - 1], &previous_power) ||
+            !sample_power_W(&history->samples[i], &current_power))
+        {
+            continue;
+        }
         const Vector2 previous = {
             plot.x + (float)(i - 1) * plot.width / (float)(history->count - 1),
             zero_y - previous_power * (plot.height / 2.0f) / max_abs};
@@ -408,8 +476,18 @@ static void draw_power_chart(Rectangle bounds, const history_t *history)
     }
 }
 
-static void append_sample(history_t *history, const battery_data_t *data)
+static bool append_sample(history_t *history, const battery_data_t *data)
 {
+    if (history == NULL || history->count > HISTORY_CAPACITY ||
+        data == NULL || !battery_data_is_valid(data))
+    {
+        return false;
+    }
+    const time_t timestamp = time(NULL);
+    if (timestamp == (time_t)-1)
+    {
+        return false;
+    }
     if (history->count == HISTORY_CAPACITY)
     {
         memmove(history->samples, history->samples + 1,
@@ -417,8 +495,9 @@ static void append_sample(history_t *history, const battery_data_t *data)
         history->count--;
     }
     history->samples[history->count].data = *data;
-    history->samples[history->count].timestamp = time(NULL);
+    history->samples[history->count].timestamp = timestamp;
     history->count++;
+    return true;
 }
 
 static void draw_sidebar(int screen_height, Texture2D logo, bool logo_loaded)
@@ -469,126 +548,90 @@ static void draw_sidebar(int screen_height, Texture2D logo, bool logo_loaded)
 
 static bool export_history_csv(const history_t *history, char *error, size_t error_size)
 {
-    FILE *file = fopen("historial_simulado.csv", "w");
+    if (history == NULL || error == NULL || error_size == 0 ||
+        history->count > HISTORY_CAPACITY)
+    {
+        if (error != NULL && error_size > 0)
+        {
+            snprintf(error, error_size, "Historial invalido para exportar.");
+        }
+        return false;
+    }
+
+    const time_t now = time(NULL);
+    const struct tm *utc_pointer = gmtime(&now);
+    if (utc_pointer == NULL)
+    {
+        snprintf(error, error_size, "No se pudo obtener la hora UTC para el nombre del CSV.");
+        return false;
+    }
+    const struct tm utc = *utc_pointer;
+    char timestamp[24];
+    if (strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &utc) == 0)
+    {
+        snprintf(error, error_size, "No se pudo formatear la hora UTC.");
+        return false;
+    }
+
+    char filename[64];
+    FILE *file = NULL;
+    for (unsigned suffix = 0; suffix < 1000; ++suffix)
+    {
+        if (snprintf(filename, sizeof(filename),
+                     "historial_simulado_%s_%03u.csv",
+                     timestamp, suffix) >= (int)sizeof(filename))
+        {
+            snprintf(error, error_size, "El nombre del CSV excede el limite.");
+            return false;
+        }
+        file = fopen(filename, "wx");
+        if (file != NULL)
+        {
+            break;
+        }
+        if (errno != EEXIST)
+        {
+            snprintf(error, error_size, "No se pudo crear el CSV: %s", strerror(errno));
+            return false;
+        }
+    }
     if (file == NULL)
     {
-        snprintf(error, error_size, "No se pudo abrir el CSV: %s", strerror(errno));
+        snprintf(error, error_size, "No se encontro un nombre CSV libre.");
         return false;
     }
 
-    if (fprintf(file,
-                "timestamp,pack_id,voltage_mV,current_mA,soc_pct,"
-                "remaining_mAh,nominal_mAh,cycles,alarms,stored_energy_Wh,"
-                "cell_count") < 0)
-    {
-        snprintf(error, error_size, "No se pudo escribir la cabecera CSV");
-        fclose(file);
-        return false;
-    }
-    for (uint8_t i = 0; i < BATTERY_MAX_CELLS; ++i)
-    {
-        if (fprintf(file, ",cell_%u_mV", (unsigned)(i + 1)) < 0)
-        {
-            snprintf(error, error_size, "No se pudo escribir la cabecera CSV");
-            fclose(file);
-            return false;
-        }
-    }
-    if (fprintf(file, ",temp_count") < 0)
-    {
-        snprintf(error, error_size, "No se pudo escribir la cabecera CSV");
-        fclose(file);
-        return false;
-    }
-    for (uint8_t i = 0; i < BATTERY_MAX_TEMPERATURES; ++i)
-    {
-        if (fprintf(file, ",temp_%u_dC", (unsigned)(i + 1)) < 0)
-        {
-            snprintf(error, error_size, "No se pudo escribir la cabecera CSV");
-            fclose(file);
-            return false;
-        }
-    }
-    if (fputc('\n', file) == EOF)
-    {
-        snprintf(error, error_size, "No se pudo terminar la cabecera CSV");
-        fclose(file);
-        return false;
-    }
-
+    battery_csv_sample_t samples[HISTORY_CAPACITY];
     for (size_t i = 0; i < history->count; ++i)
     {
-        const history_sample_t *sample = &history->samples[i];
-        const battery_data_t *data = &sample->data;
-        battery_calculations_t calculations;
-        if (!battery_calculate(data, DO_D_PCT, &calculations))
-        {
-            snprintf(error, error_size, "Muestra invalida; no se exporto el CSV");
-            fclose(file);
-            return false;
-        }
-        if (fprintf(file, "%lld,%u,%lu,%ld,%u,%lu,%lu,%u,%lu,%.3f,%u",
-                    (long long)sample->timestamp,
-                    (unsigned)data->pack_id,
-                    (unsigned long)data->voltage_mV,
-                    (long)data->current_mA,
-                    (unsigned)data->soc_pct,
-                    (unsigned long)data->remaining_mAh,
-                    (unsigned long)data->nominal_mAh,
-                    (unsigned)data->cycles,
-                    (unsigned long)data->alarms,
-                    calculations.stored_energy_Wh,
-                    (unsigned)data->cell_count) < 0)
-        {
-            snprintf(error, error_size, "Error al escribir muestras en CSV");
-            fclose(file);
-            return false;
-        }
-        for (uint8_t cell = 0; cell < BATTERY_MAX_CELLS; ++cell)
-        {
-            const int result = cell < data->cell_count
-                                   ? fprintf(file, ",%u", (unsigned)data->cell_mV[cell])
-                                   : fprintf(file, ",");
-            if (result < 0)
-            {
-                snprintf(error, error_size, "Error al escribir celdas en CSV");
-                fclose(file);
-                return false;
-            }
-        }
-        if (fprintf(file, ",%u", (unsigned)data->temp_count) < 0)
-        {
-            snprintf(error, error_size, "Error al escribir temperaturas en CSV");
-            fclose(file);
-            return false;
-        }
-        for (uint8_t temp = 0; temp < BATTERY_MAX_TEMPERATURES; ++temp)
-        {
-            const int result = temp < data->temp_count
-                                   ? fprintf(file, ",%d", (int)data->temp_dC[temp])
-                                   : fprintf(file, ",");
-            if (result < 0)
-            {
-                snprintf(error, error_size, "Error al escribir temperaturas en CSV");
-                fclose(file);
-                return false;
-            }
-        }
-        if (fputc('\n', file) == EOF)
-        {
-            snprintf(error, error_size, "Error al terminar una fila CSV");
-            fclose(file);
-            return false;
-        }
+        samples[i].timestamp_unix_s = (int64_t)history->samples[i].timestamp;
+        samples[i].data = history->samples[i].data;
     }
 
+    bool success = battery_csv_write(file, samples, history->count);
+    if (!success)
+    {
+        snprintf(error, error_size,
+                 "No se pudo escribir el historial; se conserva el CSV parcial: %s",
+                 filename);
+    }
+    if (fflush(file) != 0)
+    {
+        snprintf(error, error_size,
+                 "Error al vaciar el CSV; archivo conservado: %s", filename);
+        success = false;
+    }
     if (fclose(file) != 0)
     {
-        snprintf(error, error_size, "Error al cerrar el CSV");
-        return false;
+        snprintf(error, error_size,
+                 "Error al cerrar el CSV; archivo conservado: %s", filename);
+        success = false;
     }
-    snprintf(error, error_size, "CSV exportado: historial_simulado.csv (se reemplaza al exportar)");
-    return true;
+    if (success)
+    {
+        snprintf(error, error_size, "CSV exportado: %s", filename);
+    }
+    return success;
 }
 
 static uint8_t draw_header(int screen_width, int content_x, uint8_t pack_id,
@@ -634,7 +677,8 @@ int main(void)
     battery_simulator_t simulator;
     battery_data_t latest_data;
     battery_calculations_t calculations;
-    history_t history = {0};
+    history_t histories[2] = {0};
+    history_t *history = &histories[0];
     uint8_t selected_pack = 1;
     double sample_timer = 0.0;
     char status[160] = "Muestras simuladas cada segundo. No hay conexion con el BMS.";
@@ -648,7 +692,11 @@ int main(void)
         fprintf(stderr, "No se pudo iniciar el simulador de bateria.\n");
         return 1;
     }
-    append_sample(&history, &latest_data);
+    if (!append_sample(history, &latest_data))
+    {
+        fprintf(stderr, "No se pudo registrar la muestra inicial del simulador.\n");
+        return 1;
+    }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1360, 860, "DAZI Solar | Monitor LiFePO4");
@@ -678,8 +726,18 @@ int main(void)
 
         if (sample_timer >= 1.0)
         {
+            const double elapsed_ms = sample_timer * 1000.0;
+            uint32_t elapsed_milliseconds =
+                elapsed_ms >= (double)UINT32_MAX
+                    ? UINT32_MAX
+                    : (uint32_t)elapsed_ms;
+            if (elapsed_milliseconds == 0)
+            {
+                elapsed_milliseconds = 1000;
+            }
             sample_timer = 0.0;
-            if (!battery_simulator_next(&simulator, &latest_data) ||
+            if (!battery_simulator_step(&simulator, elapsed_milliseconds,
+                                        &latest_data) ||
                 !battery_calculate(&latest_data, DO_D_PCT, &calculations))
             {
                 snprintf(status, sizeof(status), "Error: no se pudo obtener una muestra simulada.");
@@ -687,10 +745,18 @@ int main(void)
             }
             else
             {
-                append_sample(&history, &latest_data);
-                snprintf(status, sizeof(status),
-                         "Muestras simuladas cada segundo. No hay conexion con el BMS.");
-                status_error = false;
+                if (!append_sample(history, &latest_data))
+                {
+                    snprintf(status, sizeof(status),
+                             "Error: no se pudo registrar la muestra en el historial.");
+                    status_error = true;
+                }
+                else
+                {
+                    snprintf(status, sizeof(status),
+                             "Muestras simuladas cada segundo. No hay conexion con el BMS.");
+                    status_error = false;
+                }
             }
         }
 
@@ -728,14 +794,44 @@ int main(void)
         char current[40];
         char power[40];
         char cycles[40];
-        snprintf(voltage, sizeof(voltage), "%.3f V",
-                 (double)latest_data.voltage_mV / 1000.0);
-        snprintf(current, sizeof(current), "%+.2f A",
-                 (double)latest_data.current_mA / 1000.0);
-        snprintf(power, sizeof(power), "%+.0f W",
-                 (double)latest_data.voltage_mV / 1000.0 *
+        if (battery_has_field(&latest_data, BATTERY_FIELD_VOLTAGE))
+        {
+            snprintf(voltage, sizeof(voltage), "%.3f V",
+                     (double)latest_data.voltage_mV / 1000.0);
+        }
+        else
+        {
+            snprintf(voltage, sizeof(voltage), "No disponible");
+        }
+        if (battery_has_field(&latest_data, BATTERY_FIELD_CURRENT))
+        {
+            snprintf(current, sizeof(current), "%+.2f A",
                      (double)latest_data.current_mA / 1000.0);
-        snprintf(cycles, sizeof(cycles), "%u", (unsigned)latest_data.cycles);
+        }
+        else
+        {
+            snprintf(current, sizeof(current), "No disponible");
+        }
+        if (calculations.power_available)
+        {
+            const double signed_current_A =
+                (double)latest_data.current_mA / 1000.0;
+            const double signed_power_W =
+                (double)latest_data.voltage_mV / 1000.0 * signed_current_A;
+            snprintf(power, sizeof(power), "%+.0f W", signed_power_W);
+        }
+        else
+        {
+            snprintf(power, sizeof(power), "No disponible");
+        }
+        if (battery_has_field(&latest_data, BATTERY_FIELD_CYCLES))
+        {
+            snprintf(cycles, sizeof(cycles), "%u", (unsigned)latest_data.cycles);
+        }
+        else
+        {
+            snprintf(cycles, sizeof(cycles), "--");
+        }
 
         draw_energy_card((Rectangle){margin, top_y, top_w, top_h}, &calculations);
         draw_soc_card((Rectangle){margin + top_w + gap, top_y, top_w, top_h},
@@ -749,7 +845,13 @@ int main(void)
         draw_metric_card((Rectangle){margin + metric_w + gap, metrics_y,
                                      metric_w, metrics_h},
                          "CORRIENTE", current,
-                         latest_data.current_mA > 0 ? "Carga simulada" : (latest_data.current_mA < 0 ? "Descarga simulada" : "En reposo"),
+                         !battery_has_field(&latest_data, BATTERY_FIELD_CURRENT)
+                             ? "Desconocida"
+                             : (latest_data.current_mA > 0
+                                    ? "Carga simulada"
+                                    : (latest_data.current_mA < 0
+                                           ? "Descarga simulada"
+                                           : "En reposo")),
                          latest_data.current_mA > 0 ? COLOR_GREEN : COLOR_CYAN);
         draw_metric_card((Rectangle){margin + 2.0f * (metric_w + gap), metrics_y,
                                      metric_w, metrics_h},
@@ -764,12 +866,12 @@ int main(void)
                                           content_width - cells_w - gap, panels_h},
                               &latest_data);
         draw_power_chart((Rectangle){margin, chart_y, content_width, chart_h},
-                         &history);
+                         history);
 
         if (requested_pack != 0)
         {
             selected_pack = requested_pack;
-            history.count = 0;
+            history = &histories[selected_pack - 1];
             if (!battery_simulator_init(&simulator, selected_pack,
                                         pack_capacities_mAh[selected_pack - 1]) ||
                 !battery_simulator_next(&simulator, &latest_data) ||
@@ -780,14 +882,24 @@ int main(void)
             }
             else
             {
-                append_sample(&history, &latest_data);
-                status_error = false;
+                if (!append_sample(history, &latest_data))
+                {
+                    snprintf(status, sizeof(status),
+                             "Error: no se pudo registrar la muestra del nuevo pack.");
+                    status_error = true;
+                }
+                else
+                {
+                    snprintf(status, sizeof(status),
+                             "Historial independiente por perfil. Modo simulacion.");
+                    status_error = false;
+                }
             }
         }
 
         if (export_clicked)
         {
-            status_error = !export_history_csv(&history, status, sizeof(status));
+            status_error = !export_history_csv(history, status, sizeof(status));
         }
 
         EndDrawing();

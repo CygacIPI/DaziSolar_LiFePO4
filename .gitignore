@@ -1,14 +1,17 @@
 /build/
 /build-*/
+/out/build/
 /cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
+*.cache
 cmake_install.cmake
 Makefile
 build.ninja
 rules.ninja
 compile_commands.json
 Testing/
+*.log
 
 *.exe
 *.dll
@@ -21,6 +24,7 @@ Testing/
 *.pdb
 
 /historial_simulado.csv
+/historial_simulado_*.csv
 
 .vs/
 .idea/
