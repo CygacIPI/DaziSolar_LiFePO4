@@ -20,6 +20,7 @@ add_library(lifepo4-core STATIC
     core/src/battery_coulomb_counter.c
     core/src/battery_csv.c
     core/src/battery_simulator.c
+    core/src/battery_transport.c
 )
 
 target_include_directories(lifepo4-core PUBLIC core/include)

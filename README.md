@@ -98,6 +98,14 @@ ctest --test-dir build --output-on-failure
 
 - La evaluacion tecnica adjunta valora la base como prototipo academico (6,5/10) e identifica como prioridades la integridad de datos (5/10), la validacion electrica (4/10) y la preparacion para hardware real (2/10). Estas puntuaciones no son certificaciones ni resultados de una prueba automatizada.
 - El nucleo ahora devuelve motivos concretos cuando un registro incumple limites estructurales. Tambien comprueba que la capacidad restante no exceda FULL_CAP cuando esta disponible y que las celdas declaradas tengan una tension no nula.
+- Se ha dejado preparado un primer contrato de transporte para Sprint 4 en `core/include/battery_transport.h`: representa el origen de datos (simulador, Wi-Fi, CAN, RS485 o RS232), el estado de conexion, el modo demo y la semantica `read_only`. Este punto no implementa un protocolo real ni abre conexiones; sirve para separar el transporte del nucleo y mantener la arquitectura orientada a una integracion documentada y segura.
+
+## Preparacion del Sprint 4: transporte real y documentacion del fabricante
+
+- El siguiente paso real es obtener el protocolo oficial del BMS DZPW-1600 (o del puerto concreto que se vaya a usar) del fabricante o distribuidor, con velocidad, frame, checksum, IDs, endian, escalas y mapa de registros confirmados.
+- Mientras llega esa documentacion, la aplicacion debe seguir funcionando en modo simulacion, con la fuente claramente identificada como demo y sin asumir un driver real.
+- El contrato de transporte de `battery_transport.h` permite encajar un lector real de CAN/RS485/Wi-Fi sin tocar la logica del nucleo ni mezclar fuentes de datos.
+- El flujo recomendado es: especificacion del fabricante -> parser -> validacion del paquete -> publicacion en `battery_data_t` -> calculos y UI -> registro local de historial.
 - `BUILD_DESKTOP=OFF` permite compilar y probar el nucleo sin raylib, mejorando la separacion y portabilidad del codigo:
 
   ```bash

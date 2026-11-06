@@ -1,5 +1,6 @@
 #include "battery.h"
 #include "battery_csv.h"
+#include "battery_transport.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -585,6 +586,40 @@ static void test_csv_export(void)
     CHECK(fclose(file) == 0);
 }
 
+static void test_transport_status_api(void)
+{
+    battery_transport_status_t status;
+    battery_transport_config_t config;
+
+    CHECK(battery_transport_status_init(&status, BATTERY_TRANSPORT_SOURCE_SIMULATOR));
+    CHECK(status.source == BATTERY_TRANSPORT_SOURCE_SIMULATOR);
+    CHECK(status.read_only);
+    CHECK(status.demo_mode);
+    CHECK(status.protocol_status == BATTERY_PROTOCOL_STATUS_DOCUMENTED);
+
+    memset(&config, 0, sizeof(config));
+    config.source = BATTERY_TRANSPORT_SOURCE_CAN;
+    config.target_pack_id = 3;
+    config.allow_read_only = true;
+    config.require_documented_protocol = true;
+    CHECK(battery_transport_configure(&status, &config));
+    CHECK(status.source == BATTERY_TRANSPORT_SOURCE_CAN);
+    CHECK(status.pack_id == 3);
+    CHECK(status.read_only);
+    CHECK(!status.demo_mode);
+    CHECK(status.protocol_status == BATTERY_PROTOCOL_STATUS_PENDING_CONFIRMATION);
+
+    CHECK(battery_transport_mark_connected(&status, true));
+    CHECK(status.connected);
+    CHECK(battery_transport_set_error(&status, "BMS protocol pending confirmation"));
+    CHECK(strstr(status.last_error, "protocol") != NULL);
+    CHECK(battery_transport_set_demo_mode(&status, true));
+    CHECK(status.demo_mode);
+    CHECK(status.source == BATTERY_TRANSPORT_SOURCE_SIMULATOR);
+    CHECK(battery_transport_source_supported(BATTERY_TRANSPORT_SOURCE_RS485));
+    CHECK(!battery_transport_source_supported((battery_transport_source_t)99));
+}
+
 int main(void)
 {
     test_data_validation();
@@ -593,6 +628,7 @@ int main(void)
     test_coulomb_counter();
     test_simulator_sequences();
     test_csv_export();
+    test_transport_status_api();
 
     if (failures > 0)
     {
