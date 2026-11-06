@@ -44,6 +44,12 @@ bool battery_alarm_config_for_capacity(uint32_t nominal_mAh,
         config->maximum_discharge_current_mA = 100000;
         config->current_limits_available = true;
     }
+    else if (nominal_mAh == 314000)
+    {
+        config->current_limits_available = false;
+        config->maximum_charge_current_mA = 0;
+        config->maximum_discharge_current_mA = 0;
+    }
     else if (nominal_mAh == 335000)
     {
         config->maximum_charge_current_mA = 200000;

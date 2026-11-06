@@ -289,6 +289,11 @@ static void test_alarm_thresholds_and_profiles(void)
     CHECK((assessment.active_alarms &
            BATTERY_ALARM_DISCHARGE_TEMPERATURE) == 0);
 
+    CHECK(battery_alarm_config_for_capacity(314000, &config));
+    CHECK(!config.current_limits_available);
+    CHECK(config.maximum_charge_current_mA == 0);
+    CHECK(config.maximum_discharge_current_mA == 0);
+
     CHECK(battery_alarm_config_for_capacity(335000, &config));
     CHECK(config.current_limits_available);
     data = reference_battery();
