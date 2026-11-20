@@ -636,8 +636,8 @@ static void test_pace_modbus_parser(void)
     CHECK(request[3] == 0x00u);
     CHECK(request[4] == 0x00u);
     CHECK(request[5] == 0x25u);
-    CHECK(request[6] == 0xcdu);
-    CHECK(request[7] == 0x44u);
+    CHECK(request[6] == 0x84u);
+    CHECK(request[7] == 0x11u);
 
     uint8_t response[BATTERY_PACE_MODBUS_RESPONSE_LENGTH];
     memset(response, 0, sizeof(response));
@@ -651,14 +651,15 @@ static void test_pace_modbus_parser(void)
     registers[1] = 5332u;
     registers[2] = 68u;
     registers[3] = 95u;
-    registers[4] = 6887u;
+    registers[4] = 21352u;
     registers[5] = 10000u;
     registers[6] = 31400u;
     registers[7] = 12u;
-    for (uint8_t i = 0u; i < 16u; ++i)
+    for (uint8_t i = 0u; i < 15u; ++i)
     {
-        registers[15u + i] = (uint16_t)(3300u + i);
+        registers[15u + i] = 3333u;
     }
+    registers[30] = 3325u;
     registers[31] = 250u;
     registers[32] = 251u;
     registers[33] = 249u;
@@ -684,12 +685,12 @@ static void test_pace_modbus_parser(void)
     CHECK(data.current_mA == -10000);
     CHECK(data.voltage_mV == 53320u);
     CHECK(data.soc_pct == 68u);
-    CHECK(data.remaining_mAh == 68870u);
+    CHECK(data.remaining_mAh == 213520u);
     CHECK(data.nominal_mAh == 314000u);
     CHECK(data.cycles == 12u);
     CHECK(data.cell_count == 16u);
-    CHECK(data.cell_mV[0] == 3300u);
-    CHECK(data.cell_mV[15] == 3315u);
+    CHECK(data.cell_mV[0] == 3333u);
+    CHECK(data.cell_mV[15] == 3325u);
     CHECK(data.temp_count == 4u);
     CHECK(data.temp_dC[0] == 250);
 

@@ -73,3 +73,23 @@ Para referencia cero o cerca de cero, usar diferencia absoluta y la resolucion/i
 | Fecha/hora | Estado | Magnitud | BMS | Instrumento | App | Error/diferencia | Tolerancia aprobada | Resultado |
 |---|---|---|---:|---:|---:|---:|---:|---|
 | Pendiente | Pendiente | Pendiente | — | — | — | — | Pendiente | No probado |
+
+## Ejecutado el 20/11/2026
+
+Pruebas funcionales locales del nucleo:
+
+- Compilacion estricta con GCC C11 de `core-tests`, incluyendo validacion, calculos,
+  alarmas, Coulomb, simulador, CSV, transporte y PACE Modbus.
+- Resultado: `Todas las pruebas del nucleo pasaron.` Exit code 0.
+- Build CMake y CTest del nucleo/desktop ejecutadas con el toolchain MSYS2 UCRT64.
+- Arranque de `lifepo4-desktop.exe` comprobado en UCRT64 durante 8 segundos sin
+  salida inmediata o cierre inmediato.
+
+Pruebas no funcionales locales:
+
+- Warnings estrictos habilitados para el nucleo y el target core-tests.
+- Build core-only Release comprobada.
+- Build desktop Debug comprobada.
+- Puerto o bateria real no probados todavia.
+- No se realizaron comunicaciones seriales, CAN, TCP ni escrituras durante esta
+  ejecucion.

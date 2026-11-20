@@ -1,5 +1,5 @@
 cd /c/Users/DELL/Documents/DaziSolar_LiFePO4
 cmake --build build
-./build/lifepo4-desktop.exe
+./build/lifepo4-desktop.exe 
 
 ejecutar app
