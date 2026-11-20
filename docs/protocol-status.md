@@ -4,6 +4,51 @@
 
 Las fotos del manual aportadas por el usuario confirman la disposicion de puertos y algunos pinouts. No proporcionan el protocolo de aplicacion necesario para decodificar telemetria; por tanto, aun no se puede implementar un driver real.
 
+Tras identificar el modulo P16S100A/PACE y contrastarlo con la documentacion
+comunitaria verificada, se considera Modbus RTU sobre RS485 una hipotesis
+documentada y candidata para el primer transporte real, no una integracion
+comprobada con la unidad DZPW-1600 concreta.
+
+La referencia comunitaria documenta:
+
+- puerto RS485 junto al puerto CAN;
+- 9600 bps;
+- formato serie 8N1;
+- direccion Modbus esclava 0x01 por defecto en el ejemplo;
+- holding registers de solo lectura desde el registro 0;
+- tension, corriente, SOC, capacidad, ciclos, celdas y temperaturas;
+- CRC Modbus RTU.
+
+El proyecto incluye un simulador offline PACE/Modbus que:
+
+- construye solicitudes Modbus RTU funcion 0x03;
+- valida CRC y direccion de esclavo;
+- genera respuestas con holding registers sintéticos;
+- decodifica el resultado al modelo `battery_data_t`.
+
+Este simulador no abre puertos, no utiliza 9600/19200 bps, no envia bytes al
+BMS y no sustituye la validacion de la revision de firmware de la unidad real.
+
+## Identificacion del BMS
+
+Se ha identificado la referencia PCB **PC16S100A** como modelo del BMS de la bateria
+Dazi Solar **DZPW-1600**.
+
+Esta referencia permite orientar las solicitudes de documentacion hacia el fabricante
+o proveedor correcto. Sin embargo, PC16S100A identifica el modulo o PCB concreto,
+pero no contiene por si sola:
+
+- el protocolo de comunicacion de RS485, CAN o Wi-Fi;
+- el bitrate o la velocidad serie;
+- el mapa de registros;
+- las escalas, endianness, checksum o identificadores CAN;
+- el formato de tramas;
+- ni el firmware o revision aplicables.
+
+No se ha encontrado evidencia suficiente en el repositorio ni en fuentes publicas
+verificables para afirmar que PC16S100A utiliza Modbus RTU/TCP o Pylon. No se debe
+usar ese modelo para adivinar el framing de comunicaciones.
+
 | Interfaz | Confirmado en las paginas aportadas | No confirmado / bloqueo |
 |---|---|---|
 | Wi-Fi/dongle | El dibujo de componentes identifica un modulo Wi-Fi. | Protocolo, modelo/firmware, direccionamiento, puerto y mapa de datos. Modbus TCP/502 no esta confirmado; no escanear ni enviar solicitudes. |
@@ -20,6 +65,7 @@ Los numeros 1-8 y 9-16 de X1/X2 son las referencias de pines de las dos interfac
 
 Solicitar al fabricante o distribuidor, preferentemente por escrito:
 
+- Referencia completa del modulo **PC16S100A**, revision de PCB y version de firmware.
 - Modelo exacto y revision de hardware/firmware del BMS, pantalla y dongle.
 - Documento del protocolo correspondiente al puerto que se utilizara.
 - Parametros fisicos completos: velocidad y formato serie, bitrate CAN, terminacion, aislamiento y pinout confirmado para el adaptador concreto.

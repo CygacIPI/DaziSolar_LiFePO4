@@ -102,7 +102,10 @@ ctest --test-dir build --output-on-failure
 
 ## Preparacion del Sprint 4: transporte real y documentacion del fabricante
 
-- El siguiente paso real es obtener el protocolo oficial del BMS DZPW-1600 (o del puerto concreto que se vaya a usar) del fabricante o distribuidor, con velocidad, frame, checksum, IDs, endian, escalas y mapa de registros confirmados.
+- Se ha identificado el modulo del BMS de la bateria Dazi Solar DZPW-1600 como **P16S100A** de PACE. Esta identificacion mejora el alcance documental y permite considerar Modbus RTU sobre RS485 como candidato documentado.
+- Existe una implementacion comunitaria verificable para PACE BMS que utiliza 9600 bps, direccion 0x01 y holding registers de lectura. Se ha añadido un parser offline del protocolo PACE para pruebas; no se inicia ninguna conexion ni se envia una trama al hardware.
+- Se ha añadido un simulador offline de respuestas PACE/Modbus que valida solicitudes 0x03, genera respuestas CRC válidas y alimenta el mismo parser y el modelo `battery_data_t`. Usa como hipótesis el formato 9600 8N1, pero no abre puertos ni transmite al BMS.
+- El siguiente paso real sigue siendo obtener la confirmacion aplicable al firmware exacto de la unidad, y el documento oficial del fabricante/distribuidor con speed, frame, checksum, ID, endian, escalas y mapa de registros.
 - Mientras llega esa documentacion, la aplicacion debe seguir funcionando en modo simulacion, con la fuente claramente identificada como demo y sin asumir un driver real.
 - El contrato de transporte de `battery_transport.h` permite encajar un lector real de CAN/RS485/Wi-Fi sin tocar la logica del nucleo ni mezclar fuentes de datos.
 - El flujo recomendado es: especificacion del fabricante -> parser -> validacion del paquete -> publicacion en `battery_data_t` -> calculos y UI -> registro local de historial.

@@ -1,5 +1,6 @@
 #include "battery.h"
 #include "battery_csv.h"
+#include "battery_pace_modbus.h"
 #include "battery_transport.h"
 
 #include <math.h>
@@ -620,6 +621,106 @@ static void test_transport_status_api(void)
     CHECK(!battery_transport_source_supported((battery_transport_source_t)99));
 }
 
+static void test_pace_modbus_parser(void)
+{
+    uint8_t request[BATTERY_PACE_MODBUS_REQUEST_LENGTH];
+    size_t request_length = 0u;
+
+    CHECK(battery_pace_modbus_build_read_request(
+        1u, 0u, BATTERY_PACE_MODBUS_REGISTER_COUNT,
+        request, sizeof(request), &request_length));
+    CHECK(request_length == 8u);
+    CHECK(request[0] == 0x01u);
+    CHECK(request[1] == 0x03u);
+    CHECK(request[2] == 0x00u);
+    CHECK(request[3] == 0x00u);
+    CHECK(request[4] == 0x00u);
+    CHECK(request[5] == 0x25u);
+    CHECK(request[6] == 0xcdu);
+    CHECK(request[7] == 0x44u);
+
+    uint8_t response[BATTERY_PACE_MODBUS_RESPONSE_LENGTH];
+    memset(response, 0, sizeof(response));
+    response[0] = 1u;
+    response[1] = 3u;
+    response[2] = 74u;
+
+    uint16_t registers[BATTERY_PACE_MODBUS_REGISTER_COUNT];
+    memset(registers, 0, sizeof(registers));
+    registers[0] = (uint16_t)(int16_t)-1000;
+    registers[1] = 5332u;
+    registers[2] = 68u;
+    registers[3] = 95u;
+    registers[4] = 6887u;
+    registers[5] = 10000u;
+    registers[6] = 31400u;
+    registers[7] = 12u;
+    for (uint8_t i = 0u; i < 16u; ++i)
+    {
+        registers[15u + i] = (uint16_t)(3300u + i);
+    }
+    registers[31] = 250u;
+    registers[32] = 251u;
+    registers[33] = 249u;
+    registers[34] = 250u;
+
+    for (size_t i = 0u; i < BATTERY_PACE_MODBUS_REGISTER_COUNT; ++i)
+    {
+        const size_t offset = 3u + i * 2u;
+        response[offset] = (uint8_t)(registers[i] >> 8u);
+        response[offset + 1u] = (uint8_t)(registers[i] & 0xffu);
+    }
+
+    uint16_t crc = 0u;
+    CHECK(battery_pace_modbus_crc16(response, 77u, &crc));
+    response[77] = (uint8_t)(crc & 0xffu);
+    response[78] = (uint8_t)((crc >> 8u) & 0xffu);
+
+    battery_data_t data;
+    CHECK(battery_pace_modbus_parse_read_response(
+        response, sizeof(response), 1u, 1u, &data));
+    CHECK(data.source == BATTERY_SOURCE_SERIAL);
+    CHECK(data.pack_id == 1u);
+    CHECK(data.current_mA == -10000);
+    CHECK(data.voltage_mV == 53320u);
+    CHECK(data.soc_pct == 68u);
+    CHECK(data.remaining_mAh == 68870u);
+    CHECK(data.nominal_mAh == 314000u);
+    CHECK(data.cycles == 12u);
+    CHECK(data.cell_count == 16u);
+    CHECK(data.cell_mV[0] == 3300u);
+    CHECK(data.cell_mV[15] == 3315u);
+    CHECK(data.temp_count == 4u);
+    CHECK(data.temp_dC[0] == 250);
+
+    response[78] ^= 1u;
+    CHECK(!battery_pace_modbus_parse_read_response(
+        response, sizeof(response), 1u, 1u, &data));
+
+    uint16_t simulated_registers[BATTERY_PACE_MODBUS_REGISTER_COUNT];
+    memcpy(simulated_registers, registers, sizeof(simulated_registers));
+    uint8_t simulated_response[BATTERY_PACE_MODBUS_RESPONSE_LENGTH];
+    size_t simulated_response_length = 0u;
+    CHECK(battery_pace_modbus_handle_read_request(
+        request,
+        request_length,
+        1u,
+        simulated_registers,
+        BATTERY_PACE_MODBUS_REGISTER_COUNT,
+        simulated_response,
+        sizeof(simulated_response),
+        &simulated_response_length));
+    CHECK(simulated_response_length == BATTERY_PACE_MODBUS_RESPONSE_LENGTH);
+    CHECK(battery_pace_modbus_parse_read_response(
+        simulated_response,
+        simulated_response_length,
+        1u,
+        1u,
+        &data));
+    CHECK(data.voltage_mV == 53320u);
+    CHECK(data.nominal_mAh == 314000u);
+}
+
 int main(void)
 {
     test_data_validation();
@@ -629,6 +730,7 @@ int main(void)
     test_simulator_sequences();
     test_csv_export();
     test_transport_status_api();
+    test_pace_modbus_parser();
 
     if (failures > 0)
     {
