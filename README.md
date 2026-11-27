@@ -121,7 +121,7 @@ ctest --test-dir build --output-on-failure
 - La exportacion CSV es un modulo portable del nucleo (`battery_csv`); no depende de la interfaz raylib.
 - `docs/protocol-status.md` registra interfaces, evidencia necesaria y bloqueos. `docs/validation-plan.md` separa integridad software de medicion electrica e incluye una plantilla para resultados.
 - Las fotos del manual confirman pines RJ45 para CAN, RS485-1 y RS485-2, y 9600 bps por defecto para RS485-2; no muestran el protocolo de aplicacion/mapa de datos necesario para implementar un parser.
-- **No se implemento un driver real:** no se dispone aun de protocolo confirmado, mapa de registros/tramas ni adaptador verificado. Modbus TCP por Wi-Fi sigue siendo solo una sospecha, no un dato confirmado. No se realizan conexiones ni se transmiten bytes al BMS.
+- **No se implemento un driver fisico:** hay un parser/simulador offline basado en la documentacion comunitaria PACE_MODBUS, pero falta confirmar su compatibilidad con el hardware/firmware DZPW-1600 y verificar el adaptador/pinout. Modbus TCP por Wi-Fi sigue sin confirmacion. No se realizan conexiones ni se transmiten bytes al BMS.
 - La validacion de laboratorio no esta aprobada: las tolerancias deben acordarse antes de medir, y las pruebas con la bateria requieren autorizacion, supervisión cualificada y respeto del manual y las protecciones.
 
 ## Pendientes para el primer transporte real

@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-Las fotos del manual aportadas por el usuario confirman la disposicion de puertos y algunos pinouts. No proporcionan el protocolo de aplicacion necesario para decodificar telemetria; por tanto, aun no se puede implementar un driver real.
+Las fotos del manual aportadas por el usuario confirman la disposicion de puertos y algunos pinouts. La referencia PACE y la implementacion comunitaria aportan una hipotesis de protocolo para P16S100A, pero no confirman su aplicacion a la revision exacta de la unidad DZPW-1600. Por ello, aun no se debe activar el transporte fisico para esa bateria.
 
 Tras identificar el modulo P16S100A/PACE y contrastarlo con la documentacion
 comunitaria verificada, se considera Modbus RTU sobre RS485 una hipotesis
@@ -31,23 +31,16 @@ BMS y no sustituye la validacion de la revision de firmware de la unidad real.
 
 ## Identificacion del BMS
 
-Se ha identificado la referencia PCB **PC16S100A** como modelo del BMS de la bateria
-Dazi Solar **DZPW-1600**.
+El usuario identifica el BMS de la bateria Dazi Solar **DZPW-1600** como un modelo
+PACE **P16S100A**. En mensajes anteriores tambien aparecio la cadena **PC16S100A**.
+No se dispone aun de una fotografia legible de la etiqueta/PCB que permita resolver
+si son referencias distintas, una lectura de etiqueta o una variante del mismo modulo.
+La referencia completa de hardware y firmware sigue pendiente.
 
-Esta referencia permite orientar las solicitudes de documentacion hacia el fabricante
-o proveedor correcto. Sin embargo, PC16S100A identifica el modulo o PCB concreto,
-pero no contiene por si sola:
-
-- el protocolo de comunicacion de RS485, CAN o Wi-Fi;
-- el bitrate o la velocidad serie;
-- el mapa de registros;
-- las escalas, endianness, checksum o identificadores CAN;
-- el formato de tramas;
-- ni el firmware o revision aplicables.
-
-No se ha encontrado evidencia suficiente en el repositorio ni en fuentes publicas
-verificables para afirmar que PC16S100A utiliza Modbus RTU/TCP o Pylon. No se debe
-usar ese modelo para adivinar el framing de comunicaciones.
+La comunidad documenta PACE_MODBUS para varias revisiones P16S100A, pero esa
+evidencia no demuestra que la unidad DZPW-1600 concreta use el mismo protocolo,
+configuracion o mapa de registros. El parser del proyecto es offline y no establece
+esa compatibilidad.
 
 | Interfaz | Confirmado en las paginas aportadas | No confirmado / bloqueo |
 |---|---|---|
@@ -65,7 +58,7 @@ Los numeros 1-8 y 9-16 de X1/X2 son las referencias de pines de las dos interfac
 
 Solicitar al fabricante o distribuidor, preferentemente por escrito:
 
-- Referencia completa del modulo **PC16S100A**, revision de PCB y version de firmware.
+- Referencia completa del modulo **P16S100A/PC16S100A** tal como aparece en la etiqueta, revision de PCB y version de firmware.
 - Modelo exacto y revision de hardware/firmware del BMS, pantalla y dongle.
 - Documento del protocolo correspondiente al puerto que se utilizara.
 - Parametros fisicos completos: velocidad y formato serie, bitrate CAN, terminacion, aislamiento y pinout confirmado para el adaptador concreto.

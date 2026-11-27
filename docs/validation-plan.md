@@ -6,7 +6,7 @@ La compilacion y las pruebas unitarias comprueban comportamiento del software; n
 
 ## Estado de preparacion
 
-- **Integridad de datos del nucleo:** validaciones y pruebas unitarias automatizadas para entradas, campos desconocidos, calculos, alarmas, contador de Coulomb, secuencias del simulador y CSV. No hay parser de BMS.
+- **Integridad de datos del nucleo:** validaciones y pruebas unitarias automatizadas para entradas, campos desconocidos, calculos, alarmas, contador de Coulomb, secuencias del simulador y CSV. Existe un parser PACE Modbus offline con fixtures sinteticos; no se ha validado con tramas de la unidad DZPW-1600 real.
 - **Validacion electrica:** pendiente de definir tolerancias aprobadas y obtener lecturas reales comparables.
 - **Hardware:** pendiente confirmar adaptadores, aislamiento, documentacion y supervision.
 - **Resultado actual:** solo simulacion. No se han medido ni certificado valores de una bateria.
